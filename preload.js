@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('api', {
+  platform: process.platform,
   license: {
     check: () => ipcRenderer.invoke('license:check'),
     activate: (key) => ipcRenderer.invoke('license:activate', key),
@@ -68,5 +69,25 @@ contextBridge.exposeInMainWorld('api', {
     check: () => ipcRenderer.invoke('updater:check'),
     install: () => ipcRenderer.invoke('updater:install'),
     onStatus: (cb) => ipcRenderer.on('updater:status', (_, data) => cb(data)),
+  },
+  floating: {
+    detachOne: (tile) => ipcRenderer.invoke('floating:detachOne', tile),
+    closeGroup: (groupId) => ipcRenderer.invoke('floating:closeGroup', groupId),
+    closeAll: () => ipcRenderer.invoke('floating:closeAll'),
+    run: (scriptFilename) => ipcRenderer.invoke('floating:run', scriptFilename),
+    onInit: (cb) => ipcRenderer.on('floating:init', (_, data) => cb(data)),
+    onRunScript: (cb) => ipcRenderer.on('floating:runScript', (_, sf) => cb(sf)),
+    onReattached: (cb) => ipcRenderer.on('floating:reattached', (_, freed) => cb(freed)),
+  },
+  ai: {
+    detectLocal: (apiKey) => ipcRenderer.invoke('ai:detectLocal', apiKey),
+    localChat: (payload) => ipcRenderer.invoke('ai:localChat', payload),
+    proxyFetch: (opts) => ipcRenderer.invoke('ai:proxyFetch', opts),
+  },
+  community: {
+    submit: (scriptData) => ipcRenderer.invoke('community:submit', scriptData),
+    pending: () => ipcRenderer.invoke('community:pending'),
+    approve: (id) => ipcRenderer.invoke('community:approve', id),
+    reject: (id) => ipcRenderer.invoke('community:reject', id),
   },
 });

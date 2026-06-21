@@ -6,7 +6,7 @@ const http = require('http');
 const https = require('https');
 const crypto = require('crypto');
 
-process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = 'true';
+
 
 // ── Config ──
 const RIVE_MCP_URL = 'http://127.0.0.1:9791/mcp';
@@ -107,7 +107,7 @@ function loadConfig() {
 }
 
 function saveConfig(cfg) {
-  fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2));
+  try { fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2)); } catch {}
 }
 
 function loadLayout() {
@@ -115,7 +115,7 @@ function loadLayout() {
 }
 
 function saveLayout(layout) {
-  fs.writeFileSync(LAYOUT_FILE, JSON.stringify(layout, null, 2));
+  try { fs.writeFileSync(LAYOUT_FILE, JSON.stringify(layout, null, 2)); } catch {}
 }
 
 function loadScripts() {
@@ -132,18 +132,27 @@ function loadScripts() {
   return scripts;
 }
 
+function safePath(dir, filename) {
+  const resolved = path.resolve(dir, path.basename(filename));
+  if (!resolved.startsWith(dir + path.sep) && resolved !== dir) return null;
+  return resolved;
+}
+
 function saveScript(script) {
   ensureDirs();
   const name = script._filename || (script.name.replace(/[^a-zA-Z0-9_-]/g, '_') + '.json');
+  const p = safePath(SCRIPTS_DIR, name);
+  if (!p) return null;
   const toSave = { ...script };
   delete toSave._filename;
-  fs.writeFileSync(path.join(SCRIPTS_DIR, name), JSON.stringify(toSave, null, 2));
-  return name;
+  try { fs.writeFileSync(p, JSON.stringify(toSave, null, 2)); } catch {}
+  return path.basename(p);
 }
 
 function deleteScript(filename) {
-  const p = path.join(SCRIPTS_DIR, filename);
-  if (fs.existsSync(p)) fs.unlinkSync(p);
+  const p = safePath(SCRIPTS_DIR, filename);
+  if (!p) return;
+  try { if (fs.existsSync(p)) fs.unlinkSync(p); } catch {}
 }
 
 // ── License verification — multi-platform ──
@@ -305,7 +314,9 @@ function createWindow() {
   const winX = cfg.winX ?? Math.round(sw - winW - 20);
   const winY = cfg.winY ?? Math.round((sh - winH) / 2);
 
-  mainWindow = new BrowserWindow({
+  const startHidden = process.argv.includes('--hidden');
+
+  const winOpts = {
     width: winW, height: winH, x: winX, y: winY,
     frame: false,
     transparent: true,
@@ -315,8 +326,7 @@ function createWindow() {
     maximizable: true,
     skipTaskbar: false,
     hasShadow: true,
-    vibrancy: 'under-window',
-    visualEffectState: 'active',
+    show: !startHidden,
     minWidth: 80, minHeight: 120,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -324,7 +334,14 @@ function createWindow() {
       nodeIntegration: false
     },
     backgroundColor: '#00000000'
-  });
+  };
+  // macOS-only translucency (ignored elsewhere, but keep it clean)
+  if (process.platform === 'darwin') {
+    winOpts.vibrancy = 'under-window';
+    winOpts.visualEffectState = 'active';
+  }
+
+  mainWindow = new BrowserWindow(winOpts);
 
   mainWindow.loadFile('index.html');
 
@@ -341,11 +358,473 @@ function saveBounds() {
   saveConfig(cfg);
 }
 
-app.whenReady().then(() => { ensureDirs(); createWindow(); setupAutoUpdater(); });
+// ── Floating tiles (one window per tile, snap magnetically) ──
+let floatingGroups = []; // [{ id, win, tile, moveTimer, snapReady }]
+let floatingSeq = 1;
+
+const FLOAT_W = 40;
+const FLOAT_H = 64;
+const SNAP_DIST = 18;
+const SNAP_GAP = 2;
+
+function sendTileData(group) {
+  if (!group.win || group.win.isDestroyed()) return;
+  group.win.webContents.send('floating:init', { groupId: group.id, tiles: [group.tile] });
+}
+
+function createFloatingTile(tile, x, y) {
+  const display = screen.getPrimaryDisplay();
+  const { width: sw } = display.workAreaSize;
+  const id = floatingSeq++;
+  const win = new BrowserWindow({
+    width: FLOAT_W, height: FLOAT_H,
+    x: x != null ? x : Math.round(sw - 70),
+    y: y != null ? y : 100 + (floatingGroups.length * 60),
+    frame: false, transparent: false, alwaysOnTop: true,
+    resizable: false, minimizable: false, maximizable: false,
+    skipTaskbar: true, hasShadow: false,
+    focusable: true, acceptFirstMouse: true,
+    roundedCorners: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true, nodeIntegration: false,
+      sandbox: false
+    },
+    backgroundColor: '#12121a'
+  });
+  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  const group = { id, win, tile, moveTimer: null, snapReady: false, lastPos: null, draggingCluster: false, snapping: false };
+  floatingGroups.push(group);
+  win.webContents.on('did-finish-load', () => {
+    sendTileData(group);
+  });
+  win.loadFile(path.join(__dirname, 'floating.html'));
+  win.on('moved', () => {
+    if (!group.snapReady) { group.snapReady = true; group.lastPos = win.getBounds(); return; }
+    if (group.snapping) return;
+    clearTimeout(group.moveTimer);
+    group.moveTimer = setTimeout(() => {
+      if (group.snapping) return;
+      const cur = win.getBounds();
+      const prev = group.lastPos;
+      if (prev && !group.draggingCluster) {
+        const dx = cur.x - prev.x;
+        const dy = cur.y - prev.y;
+        if (dx !== 0 || dy !== 0) {
+          const cluster = getSnappedCluster(group);
+          if (cluster.length > 1) {
+            group.draggingCluster = true;
+            for (const neighbor of cluster) {
+              if (neighbor.id === group.id) continue;
+              neighbor.snapping = true;
+              const nb = neighbor.win.getBounds();
+              neighbor.win.setPosition(nb.x + dx, nb.y + dy, false);
+              neighbor.lastPos = neighbor.win.getBounds();
+              neighbor.snapping = false;
+            }
+            group.draggingCluster = false;
+          }
+        }
+      }
+      group.lastPos = win.getBounds();
+      group.snapping = true;
+      trySnapTile(group);
+      group.lastPos = win.getBounds();
+      group.snapping = false;
+    }, 80);
+  });
+  win.on('closed', () => {
+    floatingGroups = floatingGroups.filter(g => g.id !== group.id);
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('floating:reattached', [tile.scriptFilename]);
+  });
+  return group;
+}
+
+function areSnapped(a, b) {
+  const tolerance = SNAP_GAP + 3;
+  const hAdj = (Math.abs(a.x + a.width - b.x) <= tolerance || Math.abs(b.x + b.width - a.x) <= tolerance);
+  const vOverlap = a.y < b.y + b.height + tolerance && b.y < a.y + a.height + tolerance;
+  const vAdj = (Math.abs(a.y + a.height - b.y) <= tolerance || Math.abs(b.y + b.height - a.y) <= tolerance);
+  const hOverlap = a.x < b.x + b.width + tolerance && b.x < a.x + a.width + tolerance;
+  return (hAdj && vOverlap) || (vAdj && hOverlap);
+}
+
+function getSnappedCluster(start) {
+  const visited = new Set([start.id]);
+  const queue = [start];
+  const cluster = [start];
+  while (queue.length) {
+    const cur = queue.shift();
+    if (!cur.win || cur.win.isDestroyed()) continue;
+    const cb = cur.win.getBounds();
+    for (const other of floatingGroups) {
+      if (visited.has(other.id) || !other.win || other.win.isDestroyed()) continue;
+      if (areSnapped(cb, other.win.getBounds())) {
+        visited.add(other.id);
+        queue.push(other);
+        cluster.push(other);
+      }
+    }
+  }
+  return cluster;
+}
+
+function trySnapTile(moved) {
+  if (!moved.win || moved.win.isDestroyed()) return;
+  const mb = moved.win.getBounds();
+  let bestDist = SNAP_DIST;
+  let snapX = null, snapY = null;
+  for (const other of floatingGroups) {
+    if (other.id === moved.id || !other.win || other.win.isDestroyed()) continue;
+    const ob = other.win.getBounds();
+    const dy = Math.abs(mb.y - ob.y);
+    if (dy > FLOAT_H + SNAP_DIST) continue;
+    const rightSnap = Math.abs(mb.x - (ob.x + ob.width + SNAP_GAP));
+    const leftSnap = Math.abs((mb.x + mb.width + SNAP_GAP) - ob.x);
+    const bottomSnap = Math.abs(mb.y - (ob.y + ob.height + SNAP_GAP));
+    const topSnap = Math.abs((mb.y + mb.height + SNAP_GAP) - ob.y);
+    const dx = Math.abs(mb.x - ob.x);
+    if (rightSnap < bestDist) { bestDist = rightSnap; snapX = ob.x + ob.width + SNAP_GAP; snapY = ob.y; }
+    if (leftSnap < bestDist) { bestDist = leftSnap; snapX = ob.x - mb.width - SNAP_GAP; snapY = ob.y; }
+    if (dx < SNAP_DIST && bottomSnap < bestDist) { bestDist = bottomSnap; snapX = ob.x; snapY = ob.y + ob.height + SNAP_GAP; }
+    if (dx < SNAP_DIST && topSnap < bestDist) { bestDist = topSnap; snapX = ob.x; snapY = ob.y - mb.height - SNAP_GAP; }
+  }
+  if (snapX != null && snapY != null) {
+    moved.win.setPosition(Math.round(snapX), Math.round(snapY), false);
+  }
+}
+
+
+app.whenReady().then(() => {
+  ensureDirs(); createWindow(); setupAutoUpdater();
+  const cfg = loadConfig();
+  applyAutoLaunchSettings(cfg);
+});
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 
+// ── Local AI detection (Ollama / LM Studio) ──
+function localHttp(method, urlStr, bodyObj, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    let url;
+    try { url = new URL(urlStr); } catch (e) { return reject(e); }
+    const body = bodyObj ? JSON.stringify(bodyObj) : null;
+    const req = http.request({
+      hostname: url.hostname, port: url.port, path: url.pathname + url.search, method,
+      headers: body ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) } : {}
+    }, (res) => {
+      let data = '';
+      res.on('data', c => data += c);
+      res.on('end', () => { try { resolve(JSON.parse(data)); } catch (e) { reject(e); } });
+    });
+    req.on('error', reject);
+    req.setTimeout(timeoutMs || 2000, () => req.destroy(new Error('timeout')));
+    if (body) req.write(body);
+    req.end();
+  });
+}
+
+ipcMain.handle('ai:proxyFetch', async (_, { url, method, headers, body }) => {
+  try {
+    if (typeof url !== 'string') return { error: 'Invalid URL' };
+    const https = url.startsWith('https') ? require('https') : require('http');
+    const u = new URL(url);
+    return await new Promise((resolve, reject) => {
+      const hdrs = { ...(headers || {}) };
+      if (body) hdrs['Content-Length'] = Buffer.byteLength(body);
+      const req = https.request({
+        hostname: u.hostname, port: u.port, path: u.pathname + u.search,
+        method: method || 'POST', headers: hdrs
+      }, (res) => {
+        let data = '';
+        res.on('data', c => data += c);
+        res.on('end', () => resolve({ status: res.statusCode, body: data }));
+      });
+      req.on('error', e => resolve({ error: e.message }));
+      req.setTimeout(120000, () => req.destroy(new Error('timeout')));
+      if (body) req.write(body);
+      req.end();
+    });
+  } catch (e) {
+    return { error: e.message };
+  }
+});
+
+function localHttpWithHeaders(method, urlStr, bodyObj, headers, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    let url;
+    try { url = new URL(urlStr); } catch (e) { return reject(e); }
+    const body = bodyObj ? JSON.stringify(bodyObj) : null;
+    const hdrs = { ...(headers || {}) };
+    if (body && !hdrs['Content-Length']) hdrs['Content-Length'] = Buffer.byteLength(body);
+    const req = http.request({
+      hostname: url.hostname, port: url.port, path: url.pathname + url.search, method,
+      headers: hdrs
+    }, (res) => {
+      let data = '';
+      res.on('data', c => data += c);
+      res.on('end', () => { try { resolve(JSON.parse(data)); } catch (e) { reject(e); } });
+    });
+    req.on('error', reject);
+    req.setTimeout(timeoutMs || 2000, () => req.destroy(new Error('timeout')));
+    if (body) req.write(body);
+    req.end();
+  });
+}
+
+ipcMain.handle('ai:detectLocal', async (_, apiKey) => {
+  const found = [];
+  // Ollama (default port 11434) — exposes OpenAI-compatible API at /v1
+  try {
+    const r = await localHttp('GET', 'http://127.0.0.1:11434/api/tags', null, 1200);
+    if (r && Array.isArray(r.models)) {
+      found.push({ id: 'ollama', name: 'Ollama', baseUrl: 'http://127.0.0.1:11434/v1', models: r.models.map(m => m.name).filter(Boolean) });
+    }
+  } catch {}
+  // LM Studio (default port 1234) — OpenAI-compatible
+  try {
+    let r = await localHttp('GET', 'http://127.0.0.1:1234/v1/models', null, 1200);
+    if (r && r.error && (r.error.code === 'invalid_api_key' || r.error.type === 'invalid_request_error')) {
+      // Auth required — try with provided API key first, then CLI fallback
+      const cleanDetectKey = apiKey ? String(apiKey).replace(/[^\x20-\x7E]/g, '').trim() : '';
+      if (cleanDetectKey) {
+        try {
+          r = await localHttpWithHeaders('GET', 'http://127.0.0.1:1234/v1/models', null, { 'Authorization': 'Bearer ' + cleanDetectKey }, 1200);
+          if (r && Array.isArray(r.data)) {
+            found.push({ id: 'lmstudio', name: 'LM Studio', baseUrl: 'http://127.0.0.1:1234/v1', models: r.data.map(m => m.id).filter(Boolean), needsAuth: true });
+          }
+        } catch {}
+      }
+      if (!found.some(f => f.id === 'lmstudio')) try {
+        const { execFileSync } = require('child_process');
+        const lmsPath = path.join(require('os').homedir(), '.lmstudio', 'bin', 'lms');
+        const psOut = execFileSync(lmsPath, ['ps'], { timeout: 3000, encoding: 'utf-8' });
+        const models = [];
+        const lines = psOut.split('\n');
+        for (let i = 1; i < lines.length; i++) {
+          const cols = lines[i].trim().split(/\s{2,}/);
+          if (cols.length >= 2 && cols[0] && !cols[0].startsWith('---')) models.push(cols[0]);
+        }
+        if (models.length > 0) {
+          found.push({ id: 'lmstudio', name: 'LM Studio', baseUrl: 'http://127.0.0.1:1234/v1', models, needsAuth: true });
+        }
+      } catch {}
+    } else if (r && Array.isArray(r.data)) {
+      found.push({ id: 'lmstudio', name: 'LM Studio', baseUrl: 'http://127.0.0.1:1234/v1', models: r.data.map(m => m.id).filter(Boolean) });
+    }
+  } catch {}
+  return found;
+});
+
+ipcMain.handle('ai:localChat', async (_, payload) => {
+  try {
+    if (!payload || typeof payload.baseUrl !== 'string') return { error: 'Invalid request' };
+    const headers = { 'Content-Type': 'application/json' };
+    if (payload.apiKey) {
+      const cleanKey = String(payload.apiKey).replace(/[^\x20-\x7E]/g, '').trim();
+      if (cleanKey) headers['Authorization'] = 'Bearer ' + cleanKey;
+    }
+    const data = await localHttpWithHeaders('POST', payload.baseUrl.replace(/\/$/, '') + '/chat/completions', {
+      model: payload.model,
+      messages: payload.messages,
+      temperature: 0.3,
+      max_tokens: 4096,
+      stream: false
+    }, headers, 120000);
+    if (data?.error) return { error: data.error.message || JSON.stringify(data.error) };
+    const text = data?.choices?.[0]?.message?.content;
+    if (typeof text !== 'string') return { error: 'No response from local model: ' + JSON.stringify(data).slice(0, 200) };
+    return { text };
+  } catch (e) {
+    return { error: e.message };
+  }
+});
+
 // ── IPC handlers ──
+
+// Floating tiles — one window per tile, drag-to-merge
+ipcMain.handle('floating:detachOne', (_, tile) => {
+  if (!tile || typeof tile.scriptFilename !== 'string') return false;
+  // Prevent duplicate detach of the same script
+  const already = floatingGroups.some(g => g.tile.scriptFilename === tile.scriptFilename);
+  if (already) return false;
+  createFloatingTile(tile);
+  return true;
+});
+ipcMain.handle('floating:closeGroup', (_, groupId) => {
+  const g = floatingGroups.find(x => x.id === groupId);
+  if (g && g.win && !g.win.isDestroyed()) g.win.close();
+  return true;
+});
+ipcMain.handle('floating:closeAll', () => {
+  for (const g of [...floatingGroups]) {
+    if (g.win && !g.win.isDestroyed()) g.win.close();
+  }
+  return true;
+});
+ipcMain.handle('floating:run', (_, scriptFilename) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('floating:runScript', scriptFilename);
+  }
+  return true;
+});
+
+// Community submit (Lite users → admin approval)
+ipcMain.handle('community:submit', async (_, scriptData) => {
+  try {
+    const cfg = loadConfig();
+    const payload = {
+      script: scriptData,
+      submitter: cfg.licenseEmail || 'anonymous',
+      timestamp: new Date().toISOString(),
+      version: require('./package.json').version,
+      status: 'pending'
+    };
+    const body = JSON.stringify(payload);
+    return new Promise((resolve, reject) => {
+      const req = https.request('https://api.github.com/repos/mysteropodes/rivebar-community/issues', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'token ' + (cfg.githubToken || ''),
+          'User-Agent': 'RiveBar',
+          'Accept': 'application/vnd.github.v3+json'
+        }
+      }, res => {
+        let data = '';
+        res.on('data', c => data += c);
+        res.on('end', () => {
+          if (res.statusCode === 201) resolve({ success: true, message: 'Script submitted for review!' });
+          else resolve({ success: false, message: 'Submit failed: ' + res.statusCode });
+        });
+      });
+      req.on('error', e => resolve({ success: false, message: e.message }));
+      req.write(JSON.stringify({
+        title: '[Community Submit] ' + (scriptData.name || 'Untitled Script'),
+        body: '## Script Submission\n\n**Name:** ' + (scriptData.name || 'Untitled') + '\n**Description:** ' + (scriptData.description || 'N/A') + '\n**Category:** ' + (scriptData.category || 'utility') + '\n**Submitter:** ' + payload.submitter + '\n\n```json\n' + JSON.stringify(scriptData, null, 2) + '\n```',
+        labels: ['community-submit', 'pending-review']
+      }));
+      req.end();
+    });
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
+});
+
+ipcMain.handle('community:pending', async () => {
+  try {
+    const cfg = loadConfig();
+    if (!cfg.githubToken) return { submissions: [] };
+    return new Promise((resolve) => {
+      const req = https.request('https://api.github.com/repos/mysteropodes/rivebar-community/issues?labels=pending-review&state=open&per_page=50', {
+        method: 'GET',
+        headers: { 'Authorization': 'token ' + cfg.githubToken, 'User-Agent': 'RiveBar', 'Accept': 'application/vnd.github.v3+json' }
+      }, res => {
+        let data = '';
+        res.on('data', c => data += c);
+        res.on('end', () => {
+          try {
+            const issues = JSON.parse(data);
+            const submissions = (Array.isArray(issues) ? issues : []).map(i => ({
+              id: i.number, title: i.title, body: i.body, created: i.created_at, url: i.html_url
+            }));
+            resolve({ submissions });
+          } catch { resolve({ submissions: [] }); }
+        });
+      });
+      req.on('error', () => resolve({ submissions: [] }));
+      req.end();
+    });
+  } catch { return { submissions: [] }; }
+});
+
+ipcMain.handle('community:approve', async (_, issueNumber) => {
+  try {
+    const cfg = loadConfig();
+    if (!cfg.githubToken) return { success: false };
+    return new Promise((resolve) => {
+      const req = https.request(`https://api.github.com/repos/mysteropodes/rivebar-community/issues/${issueNumber}`, {
+        method: 'PATCH',
+        headers: { 'Authorization': 'token ' + cfg.githubToken, 'User-Agent': 'RiveBar', 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' }
+      }, res => {
+        let data = '';
+        res.on('data', c => data += c);
+        res.on('end', () => resolve({ success: res.statusCode === 200 }));
+      });
+      req.on('error', () => resolve({ success: false }));
+      req.write(JSON.stringify({ state: 'closed', labels: ['community-submit', 'approved'] }));
+      req.end();
+    });
+  } catch { return { success: false }; }
+});
+
+ipcMain.handle('community:reject', async (_, issueNumber) => {
+  try {
+    const cfg = loadConfig();
+    if (!cfg.githubToken) return { success: false };
+    return new Promise((resolve) => {
+      const req = https.request(`https://api.github.com/repos/mysteropodes/rivebar-community/issues/${issueNumber}`, {
+        method: 'PATCH',
+        headers: { 'Authorization': 'token ' + cfg.githubToken, 'User-Agent': 'RiveBar', 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' }
+      }, res => {
+        let data = '';
+        res.on('data', c => data += c);
+        res.on('end', () => resolve({ success: res.statusCode === 200 }));
+      });
+      req.on('error', () => resolve({ success: false }));
+      req.write(JSON.stringify({ state: 'closed', labels: ['community-submit', 'rejected'] }));
+      req.end();
+    });
+  } catch { return { success: false }; }
+});
+
+// Auto-launch with Rive
+let riveWatcherInterval = null;
+let riveWasRunning = false;
+
+function applyAutoLaunchSettings(cfg) {
+  const opts = { openAtLogin: !!cfg.autoLaunchWithRive };
+  if (process.platform === 'darwin') {
+    opts.openAsHidden = true;
+  } else if (process.platform === 'win32') {
+    // Windows has no "open as hidden"; pass a flag the renderer can read to start minimized
+    opts.args = ['--hidden'];
+  }
+  app.setLoginItemSettings(opts);
+  if (cfg.autoLaunchWithRive) startRiveWatcher(); else stopRiveWatcher();
+}
+
+function checkRiveRunning(cb) {
+  if (process.platform === 'win32') {
+    execFile('tasklist', ['/FI', 'IMAGENAME eq Rive.exe', '/NH'], (err, stdout) => {
+      cb(!err && /Rive\.exe/i.test(stdout || ''));
+    });
+  } else {
+    // macOS / Linux
+    execFile('pgrep', ['-x', 'Rive'], (err, stdout) => {
+      cb(!err && (stdout || '').trim().length > 0);
+    });
+  }
+}
+
+function startRiveWatcher() {
+  if (riveWatcherInterval) return;
+  riveWatcherInterval = setInterval(() => {
+    checkRiveRunning((running) => {
+      if (!mainWindow || mainWindow.isDestroyed()) return;
+      if (running && !riveWasRunning) {
+        mainWindow.show();
+        mainWindow.focus();
+      }
+      riveWasRunning = running;
+    });
+  }, 30000);
+}
+
+function stopRiveWatcher() {
+  if (riveWatcherInterval) { clearInterval(riveWatcherInterval); riveWatcherInterval = null; }
+  riveWasRunning = false;
+}
 
 // License
 ipcMain.handle('license:check', async () => {
@@ -381,7 +860,8 @@ ipcMain.handle('license:activate', async (_, key) => {
 // MCP
 ipcMain.handle('mcp:ping', async () => { mcpInitialized = false; return await ensureMcpInit(); });
 ipcMain.handle('mcp:callTool', async (_, name, args) => {
-  try { return await mcpCallTool(name, typeof args === 'string' ? JSON.parse(args) : args); }
+  if (typeof name !== 'string' || !name.length) return { error: 'Invalid tool name' };
+  try { return await mcpCallTool(name, typeof args === 'string' ? JSON.parse(args) : (args || {})); }
   catch (e) { return { error: e.message }; }
 });
 ipcMain.handle('mcp:listTools', async () => {
@@ -431,11 +911,15 @@ ipcMain.handle('config:set', (_, key, value) => {
   cfg[key] = value;
   saveConfig(cfg);
   if (key === 'alwaysOnTop' && mainWindow) mainWindow.setAlwaysOnTop(value);
+  if (key === 'autoLaunchWithRive') applyAutoLaunchSettings(cfg);
   return true;
 });
 
 // Window
-ipcMain.handle('window:resize', (_, w, h) => { if (mainWindow) mainWindow.setSize(w, h, false); });
+ipcMain.handle('window:resize', (_, w, h) => {
+  if (!mainWindow) return;
+  mainWindow.setSize(Math.max(200, Math.min(4000, w|0)), Math.max(200, Math.min(4000, h|0)), false);
+});
 ipcMain.handle('window:getSize', () => mainWindow ? mainWindow.getSize() : [400, 600]);
 ipcMain.handle('window:minimize', () => { if (mainWindow) mainWindow.minimize(); });
 ipcMain.handle('window:close', () => { if (mainWindow) mainWindow.close(); });
@@ -579,6 +1063,7 @@ ipcMain.handle('license:refresh', async () => {
 // Drop import — supports free scripts (steps) and paid scripts (license + steps)
 ipcMain.handle('scripts:importFromPath', (_, filePath) => {
   try {
+    if (typeof filePath !== 'string' || !filePath.endsWith('.json')) return { error: 'Invalid file' };
     const raw = JSON.parse(fs.readFileSync(filePath, 'utf8'));
     const items = Array.isArray(raw) ? raw : [raw];
     const imported = [];

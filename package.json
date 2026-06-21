@@ -1,6 +1,6 @@
 {
   "name": "rivebar",
-  "version": "1.4.0",
+  "version": "1.6.0",
   "description": "RiveBar — Modular floating toolbar for Rive scripts (Lite & Pro)",
   "main": "main.js",
   "author": "Cyril",
@@ -21,7 +21,12 @@
       "icon": "icons/icon.icns"
     },
     "win": {
-      "target": "nsis",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
       "icon": "icons/icon.png"
     },
     "asar": true,
@@ -29,6 +34,7 @@
       "main.js",
       "preload.js",
       "index.html",
+      "floating.html",
       "schema.js",
       "icons/**",
       "package.json",
