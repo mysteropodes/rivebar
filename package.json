@@ -1,6 +1,6 @@
 {
   "name": "rivebar",
-  "version": "1.7.3",
+  "version": "1.7.4",
   "description": "RiveBar — Modular floating toolbar for Rive scripts (Lite & Pro)",
   "main": "main.js",
   "author": "Cyril",

@@ -794,7 +794,7 @@ html, body { background: transparent; height: 100%; overflow: hidden; font-famil
           Then reopen the app. This removes the quarantine flag from unsigned apps.
         </p>
         <hr style="border:none;border-top:1px solid var(--border);margin:10px 0;">
-        <p style="margin:0 0 6px;font-weight:600;">🆕 What's New (v1.7.3)</p>
+        <p style="margin:0 0 6px;font-weight:600;">🆕 What's New (v1.7.4)</p>
         <p style="margin:0;">
           • <b>Folders</b> — organize presets into collapsible folders in Pro (drag & drop supported)<br>
           • <b>Manual toolbar add</b> — scripts are no longer auto-added; use ➕ on each preset<br>
@@ -844,7 +844,7 @@ html, body { background: transparent; height: 100%; overflow: hidden; font-famil
       </div>
       <div class="setting-row">
         <label>App version</label>
-        <span style="font-size:11px;color:var(--text2)" id="appVersion">1.7.3</span>
+        <span style="font-size:11px;color:var(--text2)" id="appVersion">1.7.4</span>
       </div>
       <div class="setting-row">
         <label>Updates</label>
@@ -886,7 +886,7 @@ html, body { background: transparent; height: 100%; overflow: hidden; font-famil
         <div class="feedback-status" id="feedbackStatus"></div>
       </div>
       <div class="about-card" style="text-align:center;">
-        <p style="margin:0;font-size:10px;color:var(--text2);">RiveBar v<span id="aboutVersion">1.7.3</span> — Made with ♥ for the Rive community</p>
+        <p style="margin:0;font-size:10px;color:var(--text2);">RiveBar v<span id="aboutVersion">1.7.4</span> — Made with ♥ for the Rive community</p>
       </div>
     </div>
   </div>
@@ -2099,7 +2099,7 @@ const ICON_DATA = {
   rocket:     { tags: 'launch deploy fast startup', d: '<path d="M9.19 6.35c-2.04 2.29-3.44 5.58-3.57 5.89L2 10.69l4.05-4.05c.47-.47 1.15-.68 1.81-.55l1.33.26zM11.17 17s3.74-1.55 5.89-3.7c5.4-5.4 4.5-9.62 4.21-10.57-.95-.3-5.17-1.19-10.57 4.21C8.55 9.09 7 12.83 7 12.83l4.17 4.17zm6.48-3.18c-.47.47-1.15.68-1.81.55l-1.33-.26 1.71 1.71 4.05-4.05-1.57-3.62c-.09.23-3.49 7.96-5.89 10.51zM14.5 12c-1.38 0-2.5-1.12-2.5-2.5S13.12 7 14.5 7 17 8.12 17 9.5 15.88 12 14.5 12z"/>' },
   auto_awesome: { tags: 'sparkle magic shine ai stars', d: '<path d="M19 9l1.25-2.75L23 5l-2.75-1.25L19 1l-1.25 2.75L15 5l2.75 1.25L19 9zm-7.5.5L9 4 6.5 9.5 1 12l5.5 2.5L9 20l2.5-5.5L17 12l-5.5-2.5zM19 15l-1.25 2.75L15 19l2.75 1.25L19 23l1.25-2.75L23 19l-2.75-1.25L19 15z"/>' },
   all_inclusive: { tags: 'infinity loop endless forever repeat', d: '<path d="M18.6 6.62c-1.44 0-2.8.56-3.77 1.53L12 10.66 10.48 12h.01L7.8 14.39c-.64.64-1.49.99-2.4.99-1.87 0-3.39-1.51-3.39-3.38S3.53 8.62 5.4 8.62c.91 0 1.76.35 2.44 1.03l1.13 1 1.51-1.34L9.22 8.2A5.37 5.37 0 005.4 6.62C2.42 6.62 0 9.04 0 12s2.42 5.38 5.4 5.38c1.44 0 2.8-.56 3.77-1.53l2.83-2.5.01.01L13.52 12h-.01l2.69-2.39c.64-.64 1.49-.99 2.4-.99 1.87 0 3.39 1.51 3.39 3.38s-1.52 3.38-3.39 3.38c-.9 0-1.76-.35-2.44-1.03l-1.14-1.01-1.51 1.34 1.27 1.12a5.386 5.386 0 003.82 1.57c2.98 0 5.4-2.41 5.4-5.38s-2.42-5.37-5.4-5.37z"/>' },
-  animation:  { tags: 'motion keyframe timeline animate', d: '<path d="M15 2c-2.71 0-5.05 1.54-6.22 3.78a7.062 7.062 0 00-3 3A7.014 7.014 0 002 15c0 3.87 3.13 7 7 7 2.71 0 5.05-1.54 6.22-3.78a7.062 7.062 0 003-3A7.014 7.014 0 0022 9c0-3.87-3.13-7-7-7zM9 20c-2.76 0-5-2.24-5-5 0-1.12.37-2.16 1-3 0 3.87 3.13 7 7 7-.84.63-1.88 1-3 1zm3-3c-2.76 0-5-2.24-5-5 0-1.12.37-2.16 1-3 0 3.86 3.13 6.99 7 7-.84.63-1.88 1-3 1zm4.7-3.3c-.53.19-1.1.3-1.7.3-2.76 0-5-2.24-5-5 0-.6.11-1.17.3-1.7.53-.19 1.1-.3 1.7-.3 2.76 0 5 2.24 5 5 0 .6-.11 1.17-.3 1.7z"/>' },
+  animation:  { tags: 'motion keyframe timeline animate', d: '<path d="M15 2c-2.71 0-5.05 1.54-6.22 3.78a7.062 7.062 0 00-3 3A7.014 7.014 0 002 15c0 3.87 3.13 7 7 7 2.71 0 5.05-1.54 6.22-3.78a7.062 7.062 0 003-3A7.014 7.014 0 0022 9c0-3.87-3.13-7-7-7zM9 20c-2.76 0-5-2.24-5-5 0-1.12.37-2.16 1-3 0 3.87 3.13 7 7 7-.84.63-1.88 1-3 1zm3-3c-2.76 0-5-2.24-5-5 0-1.12.37-2.16 1-3 0 3.86 3.13 6.99 7 7-.84.63-1.88 1-3 1zm4.7-3.3c-.53.19-1.1.3-1.7.4-2.76 0-5-2.24-5-5 0-.6.11-1.17.3-1.7.53-.19 1.1-.3 1.7-.3 2.76 0 5 2.24 5 5 0 .6-.11 1.17-.3 1.7z"/>' },
   widgets:    { tags: 'components modules blocks puzzle', d: '<path d="M13 13v8h8v-8h-8zM3 21h8v-8H3v8zM3 3v8h8V3H3zm13.66-1.31L11 7.34 16.66 13l5.66-5.66-5.66-5.65z"/>' },
   extension:  { tags: 'plugin addon module puzzle piece', d: '<path d="M20.5 11H19V7c0-1.1-.9-2-2-2h-4V3.5C13 2.12 11.88 1 10.5 1S8 2.12 8 3.5V5H4c-1.1 0-1.99.9-1.99 2v3.8H3.5c1.49 0 2.7 1.21 2.7 2.7s-1.21 2.7-2.7 2.7H2V20c0 1.1.9 2 2 2h3.8v-1.5c0-1.49 1.21-2.7 2.7-2.7 1.49 0 2.7 1.21 2.7 2.7V22H17c1.1 0 2-.9 2-2v-4h1.5c1.38 0 2.5-1.12 2.5-2.5S21.88 11 20.5 11z"/>' },
   palette:    { tags: 'color theme paint design art', d: '<path d="M12 2C6.49 2 2 6.49 2 12s4.49 10 10 10c1.38 0 2.5-1.12 2.5-2.5 0-.61-.23-1.2-.64-1.67a.528.528 0 01-.13-.33c0-.28.22-.5.5-.5H16c3.31 0 6-2.69 6-6 0-4.96-4.49-9-10-9zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 8 6.5 8 8 8.67 8 9.5 7.33 11 6.5 11zm3-4C8.67 7 8 6.33 8 5.5S8.67 4 9.5 4s1.5.67 1.5 1.5S10.33 7 9.5 7zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 4 14.5 4s1.5.67 1.5 1.5S15.33 7 14.5 7zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 8 17.5 8s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>' },
@@ -3224,7 +3224,7 @@ async function detachTile(idx) {
     category: script?.category || 'utility',
     color: item.color || '#5f33ff',
     scriptFilename: item.scriptFilename,
-    display: item.display || 'icon',
+    display: item.displayMode || 'icon',
     widgetHtml: script?.widget || null,
     size: item.size || 'm'
   };
@@ -4969,7 +4969,9 @@ async function proAddToToolbar(idx) {
   const p = proPresets[idx];
   if (!p) return;
   const scriptData = { name: p.name || 'Untitled', description: p.description || '', steps: p.steps || [], hasUi: (p.steps||[]).some(s => s.tool === '_ui'), icon: p.icon, category: p.category, helpGuide: p.helpGuide };
+  if (p.display) scriptData.display = p.display;
   if (p.widget) scriptData.widget = p.widget;
+  if (p.size) scriptData.size = p.size;
   const fname = await window.api.scripts.save(scriptData);
   scriptData._filename = fname;
   scripts.push(scriptData);
