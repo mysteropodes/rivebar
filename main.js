@@ -78,6 +78,7 @@ function setupAutoUpdater() {
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
   autoUpdater.forceDevUpdateConfig = true;
+  autoUpdater.disableWebInstaller = false;
   autoUpdater.logger = null;
 
   let _updateAvailable = false;

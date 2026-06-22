@@ -1,6 +1,6 @@
 {
   "name": "rivebar",
-  "version": "1.7.2",
+  "version": "1.7.3",
   "description": "RiveBar — Modular floating toolbar for Rive scripts (Lite & Pro)",
   "main": "main.js",
   "author": "Cyril",
@@ -18,7 +18,8 @@
     "mac": {
       "target": ["dmg", "zip"],
       "category": "public.app-category.developer-tools",
-      "icon": "icons/icon.icns"
+      "icon": "icons/icon.icns",
+      "identity": null
     },
     "win": {
       "target": [
