@@ -59,9 +59,10 @@ html, body { background: transparent; height: 100%; overflow: hidden; font-famil
 /* ── Tile Grid (WP-style) ── */
 .grid-area { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 6px; }
 .btn-grid {
-  display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px;
+  display: grid; grid-template-columns: repeat(6, 42px); gap: 6px;
   grid-auto-rows: 42px;
   position: relative;
+  min-height: 2000px;
 }
 .script-btn {
   border-radius: 10px; border: none; background: var(--tile-bg, var(--accent));
@@ -74,6 +75,9 @@ html, body { background: transparent; height: 100%; overflow: hidden; font-famil
 .script-btn.running { box-shadow: 0 0 0 2px var(--orange); animation: pulse 1s infinite; }
 .script-btn.done { box-shadow: 0 0 0 2px var(--green); }
 .script-btn.error { box-shadow: 0 0 0 2px var(--red); }
+/* Drag drop ghost */
+.drag-ghost { position: absolute; border: 2px dashed var(--accent); border-radius: 10px; pointer-events: none; z-index: 5; opacity: 0.6; transition: left 0.1s, top 0.1s, width 0.1s, height 0.1s; }
+.drag-ghost.invalid { border-color: var(--red); opacity: 0.3; }
 /* Tile sizes: span fixed-size grid cells */
 .script-btn.size-s { grid-column: span 1; grid-row: span 1; }
 .script-btn.size-m { grid-column: span 2; grid-row: span 2; }
@@ -427,12 +431,12 @@ html, body { background: transparent; height: 100%; overflow: hidden; font-famil
 /* ── UI Step Modal ── */
 .ui-modal-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 400;
-  display: none; align-items: center; justify-content: center;
+  display: none; align-items: center; justify-content: center; padding: 8px;
 }
 .ui-modal-overlay.show { display: flex; }
 .ui-modal {
   background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
-  padding: 16px; min-width: 300px; max-width: 90%; max-height: 80vh; overflow-y: auto;
+  padding: 16px; min-width: 0; width: 100%; max-width: min(90%, 480px); max-height: 80vh; overflow-y: auto; box-sizing: border-box;
 }
 .ui-modal h3 { font-size: 14px; margin-bottom: 14px; color: var(--text); }
 .ui-modal .ui-field { margin-bottom: 12px; }
@@ -454,7 +458,8 @@ html, body { background: transparent; height: 100%; overflow: hidden; font-famil
 .ui-modal .ui-check-row { display: flex; align-items: center; gap: 8px; }
 .ui-modal .ui-check-row input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px; }
 .ui-modal .ui-check-row label { margin-bottom: 0; font-size: 12px; color: var(--text); }
-.ui-modal .ui-custom-html { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg); }
+.ui-modal .ui-custom-html { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg); max-width: 100%; box-sizing: border-box; }
+.ui-modal .ui-custom-html input, .ui-modal .ui-custom-html select, .ui-modal .ui-custom-html textarea, .ui-modal .ui-custom-html button { max-width: 100%; box-sizing: border-box; }
 .ui-modal .ui-btn-row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
 .ui-modal .ui-btn { padding: 6px 16px; border-radius: 6px; border: none; font-size: 12px; cursor: pointer; font-weight: 600; }
 .ui-modal .ui-btn-primary { background: var(--accent); color: white; }
@@ -783,7 +788,13 @@ html, body { background: transparent; height: 100%; overflow: hidden; font-famil
         <p style="margin:0 0 6px;font-weight:600;">➕ Adding to Toolbar</p>
         <p style="margin:0 0 8px;">Scripts from the Store are installed but not added to the toolbar automatically. Open the <b>Pro Editor</b>, find the preset, and click the <b>➕</b> button to add it.</p>
         <hr style="border:none;border-top:1px solid var(--border);margin:10px 0;">
-        <p style="margin:0 0 6px;font-weight:600;">🆕 What's New (v1.3.0)</p>
+        <p style="margin:0 0 6px;font-weight:600;">🍎 macOS "damaged" alert fix</p>
+        <p style="margin:0 0 8px;">If macOS says RiveBar is "damaged", open Terminal and run:<br>
+          <code style="display:block;background:var(--bg2);padding:6px 8px;border-radius:6px;margin-top:4px;font-size:10px;user-select:all;cursor:text;">xattr -cr /Applications/RiveBar.app</code>
+          Then reopen the app. This removes the quarantine flag from unsigned apps.
+        </p>
+        <hr style="border:none;border-top:1px solid var(--border);margin:10px 0;">
+        <p style="margin:0 0 6px;font-weight:600;">🆕 What's New (v1.7.2)</p>
         <p style="margin:0;">
           • <b>Folders</b> — organize presets into collapsible folders in Pro (drag & drop supported)<br>
           • <b>Manual toolbar add</b> — scripts are no longer auto-added; use ➕ on each preset<br>
@@ -833,7 +844,7 @@ html, body { background: transparent; height: 100%; overflow: hidden; font-famil
       </div>
       <div class="setting-row">
         <label>App version</label>
-        <span style="font-size:11px;color:var(--text2)" id="appVersion">1.3.0</span>
+        <span style="font-size:11px;color:var(--text2)" id="appVersion">1.7.2</span>
       </div>
       <div class="setting-row">
         <label>Updates</label>
@@ -875,7 +886,7 @@ html, body { background: transparent; height: 100%; overflow: hidden; font-famil
         <div class="feedback-status" id="feedbackStatus"></div>
       </div>
       <div class="about-card" style="text-align:center;">
-        <p style="margin:0;font-size:10px;color:var(--text2);">RiveBar v<span id="aboutVersion">1.3.0</span> — Made with ♥ for the Rive community</p>
+        <p style="margin:0;font-size:10px;color:var(--text2);">RiveBar v<span id="aboutVersion">1.7.2</span> — Made with ♥ for the Rive community</p>
       </div>
     </div>
   </div>
@@ -965,6 +976,17 @@ html, body { background: transparent; height: 100%; overflow: hidden; font-famil
       <div class="field" id="widgetField" style="display:none;">
         <label>Widget HTML <span style="font-size:9px;color:var(--text2);font-weight:400;">(displayed inside tile)</span></label>
         <textarea id="editWidgetHtml" rows="6" placeholder="<div style='padding:8px;color:#fff;'>&#10;  <button onclick=\"_widgetRun('filename.json',{key:'val'})\">Go</button>&#10;</div>" style="font-family:monospace;font-size:10px;width:100%;resize:vertical;background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px;"></textarea>
+      </div>
+      <div class="field">
+        <label>Help Guide <span style="font-size:9px;color:var(--text2);font-weight:400;">(shown via right-click → Help Guide)</span></label>
+        <textarea id="editHelpGuide" rows="3" placeholder="How to use this script, tips..." style="font-size:11px;width:100%;resize:vertical;background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px;"></textarea>
+      </div>
+      <div class="field">
+        <label>Preview image/GIF <span style="font-size:9px;color:var(--text2);font-weight:400;">(for store listing)</span></label>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <input type="file" id="editPreviewFile" accept="image/*,.gif" style="font-size:10px;flex:1;">
+          <img id="editPreviewThumb" style="width:40px;height:40px;border-radius:6px;object-fit:cover;display:none;border:1px solid var(--border);">
+        </div>
       </div>
       <div class="btn-row">
         <button class="btn btn-ghost" onclick="closeEditModal()">Cancel</button>
@@ -1855,8 +1877,15 @@ toast('Found ' + ids.length + ' objects', 'info');</pre>
             </div>
           </div>
           <div class="ai-chat-input">
-            <textarea id="aiInput" placeholder="Describe the script you want..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();aiSend();}"></textarea>
+            <div id="aiAttachPreview" style="display:none;padding:4px 8px 0;gap:4px;flex-wrap:wrap;width:100%;"></div>
+            <div style="display:flex;align-items:center;gap:4px;flex:1;">
+              <button onclick="aiAttachFile()" title="Attach JSON or image" style="padding:0 6px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text2);font-size:14px;cursor:pointer;flex-shrink:0;line-height:32px;">📎</button>
+              <input type="file" id="aiFileInput" accept=".json,application/json,image/*" multiple style="display:none" onchange="aiHandleFiles(this.files)">
+              <textarea id="aiInput" placeholder="Describe the script you want..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();aiSend();}"></textarea>
+            </div>
+            <button id="aiAgentToggle" onclick="aiToggleAgentMode()" title="Agent Mode: AI calls tools directly" style="padding:0 8px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text2);font-size:10px;cursor:pointer;flex-shrink:0;line-height:34px;">🤖</button>
             <button onclick="aiSend()" id="aiSendBtn">Send</button>
+            <button onclick="aiStop()" id="aiStopBtn" style="display:none;padding:0 14px;border-radius:8px;border:none;background:var(--red,#e55c8a);color:white;font-weight:700;font-size:12px;cursor:pointer;flex-shrink:0;">Stop</button>
           </div>
         </div>
       </div>
@@ -1896,6 +1925,12 @@ toast('Found ' + ids.length + ' objects', 'info');</pre>
             </div>
             <div class="pub-field" style="flex:1"><label>Icon</label>
               <select id="pubIcon"><option value="bolt">bolt</option><option value="grid">grid</option><option value="visibility">visibility</option><option value="bone">bone</option><option value="analytics">analytics</option><option value="water_drop">water_drop</option><option value="dashboard">dashboard</option><option value="auto_awesome">auto_awesome</option><option value="tune">tune</option><option value="text_fields">text_fields</option><option value="upload">upload</option><option value="star">star</option></select>
+            </div>
+          </div>
+          <div class="pub-field"><label>Preview image/GIF <span style="font-size:9px;color:var(--text2)">(shown in store listing)</span></label>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <input type="file" id="pubPreviewFile" accept="image/*,.gif" style="font-size:11px;flex:1;">
+              <img id="pubPreviewThumb" style="width:48px;height:48px;border-radius:6px;object-fit:cover;display:none;border:1px solid var(--border);">
             </div>
           </div>
           <div class="pub-field"><label>Help Guide <span style="font-size:9px;color:var(--text2)">(shown to users via right-click → Help Guide)</span></label><textarea id="pubHelpGuide" rows="3" placeholder="How to use this script, tips, requirements..."></textarea></div>
@@ -2171,7 +2206,7 @@ async function loadAll() {
   // Add new scripts not in layout
   for (const s of scripts) {
     if (!layout.some(l => l.scriptFilename === s._filename)) {
-      layout.push({ scriptFilename: s._filename, size: 'm', color: COLORS[layout.length % COLORS.length], icon: ICON_KEYS[layout.length % ICON_KEYS.length], order: layout.length });
+      layout.push({ scriptFilename: s._filename, size: s.size || 'm', color: COLORS[layout.length % COLORS.length], icon: s.icon || ICON_KEYS[layout.length % ICON_KEYS.length], displayMode: s.display || 'both', order: layout.length });
     }
   }
   renderGrid();
@@ -2251,21 +2286,44 @@ async function checkConnection() {
 const _connInterval = setInterval(checkConnection, 10000);
 
 // ── Grid helpers ──
-const GRID_COLS = 6;
 const GRID_GAP = 6;
 const TILE_SPANS = { s: [1,1], m: [2,2], w: [4,2], l: [4,4] };
+const GRID_SCALES = { small: 32, medium: 42, large: 56 };
+let gridScale = 'medium';
 
-function updateGridRowHeight() {
+function getGridCols() {
+  const grid = document.getElementById('btnGrid');
+  if (!grid || !grid.parentElement) return 6;
+  const pw = grid.parentElement.clientWidth;
+  if (pw < 50) return 6;
+  const unit = GRID_SCALES[gridScale] || 42;
+  return Math.max(6, Math.floor((pw - 12) / (unit + GRID_GAP)));
+}
+
+function applyGridScale() {
   const grid = document.getElementById('btnGrid');
   if (!grid) return;
-  const w = grid.clientWidth;
-  const unit = (w - (GRID_COLS - 1) * GRID_GAP) / GRID_COLS;
-  grid.style.gridAutoRows = Math.floor(unit) + 'px';
-  const maxRow = getMaxGridRow();
-  const rows = Math.max(1, maxRow - 1);
-  grid.style.minHeight = (rows * (Math.floor(unit) + GRID_GAP)) + 'px';
+  const unit = GRID_SCALES[gridScale] || 42;
+  const cols = getGridCols();
+  grid.style.gridTemplateColumns = `repeat(${cols}, ${unit}px)`;
+  grid.style.gridAutoRows = `${unit}px`;
 }
-window.addEventListener('resize', updateGridRowHeight);
+window.addEventListener('resize', applyGridScale);
+
+function setGridScale(scale) {
+  hideCtxMenu();
+  gridScale = scale;
+  localStorage.setItem('gridScale', scale);
+  applyGridScale();
+  showToast('Grid → ' + scale, 'success');
+}
+
+// Restore grid scale on load
+(function() {
+  const saved = localStorage.getItem('gridScale');
+  if (saved && GRID_SCALES[saved]) gridScale = saved;
+  setTimeout(applyGridScale, 100);
+})();
 
 // Auto-assign grid positions — always reflow all items to avoid overlaps
 function autoPlaceItems() {
@@ -2275,7 +2333,7 @@ function autoPlaceItems() {
     const [cSpan, rSpan] = TILE_SPANS[item.size || 'm'] || [2,2];
     // Check if current position is valid (no overlap, within grid)
     if (item.gridCol != null && item.gridRow != null) {
-      let valid = item.gridCol + cSpan - 1 <= GRID_COLS;
+      let valid = item.gridCol + cSpan - 1 <= getGridCols();
       if (valid) {
         for (let r = item.gridRow; r < item.gridRow + rSpan && valid; r++)
           for (let c = item.gridCol; c < item.gridCol + cSpan && valid; c++)
@@ -2290,7 +2348,7 @@ function autoPlaceItems() {
     }
     // Find next available slot
     for (let row = 1; row < 200; row++) {
-      for (let col = 1; col <= GRID_COLS - cSpan + 1; col++) {
+      for (let col = 1; col <= getGridCols() - cSpan + 1; col++) {
         let fits = true;
         for (let r = row; r < row + rSpan && fits; r++)
           for (let c = col; c < col + cSpan && fits; c++)
@@ -2321,17 +2379,16 @@ function getMaxGridRow() {
 // Find which cell a pixel position maps to
 function pixelToCell(grid, x, y) {
   const rect = grid.getBoundingClientRect();
-  const w = rect.width;
-  const unit = (w - (GRID_COLS - 1) * GRID_GAP) / GRID_COLS;
+  const unit = GRID_SCALES[gridScale] || 42;
   const col = Math.floor((x - rect.left) / (unit + GRID_GAP)) + 1;
   const row = Math.floor((y - rect.top) / (unit + GRID_GAP)) + 1;
-  return [Math.max(1, Math.min(col, GRID_COLS)), Math.max(1, row)];
+  return [Math.max(1, Math.min(col, getGridCols())), Math.max(1, row)];
 }
 
 // Check if a tile can fit at (col, row), ignoring a specific layout index
 function canFitAt(col, row, size, ignoreIdx) {
   const [cSpan, rSpan] = TILE_SPANS[size || 'm'] || [2,2];
-  if (col + cSpan - 1 > GRID_COLS) return false;
+  if (col + cSpan - 1 > getGridCols()) return false;
   for (let i = 0; i < layout.length; i++) {
     if (i === ignoreIdx) continue;
     const it = layout[i];
@@ -2384,7 +2441,7 @@ function renderGrid() {
   if (_tileObserver) _tileObserver.disconnect();
   const grid = document.getElementById('btnGrid');
   grid.innerHTML = '';
-  requestAnimationFrame(updateGridRowHeight);
+
 
   const hasButtons = layout.some(item => item.type === 'group' || scripts.find(s => s._filename === item.scriptFilename));
   if (!hasButtons) {
@@ -2481,6 +2538,7 @@ function renderGrid() {
       if (_swapTimer) clearTimeout(_swapTimer);
       _swapPending = null; dragIdx = -1;
       grid.querySelectorAll('.dragging').forEach(function(b) { b.classList.remove('dragging'); });
+      grid.querySelectorAll('.drag-ghost').forEach(g => g.remove());
       window.api.layout.save(layout);
     });
     grid.appendChild(btn);
@@ -2684,8 +2742,29 @@ function bindGridDrop() {
   const gridArea = document.getElementById('gridArea');
   if (!grid || !gridArea) return;
   _gridDropBound = true;
-  function handleDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
+  let _dragGhost = null;
+  function ensureDragGhost() {
+    if (!_dragGhost) { _dragGhost = document.createElement('div'); _dragGhost.className = 'drag-ghost'; grid.appendChild(_dragGhost); }
+    return _dragGhost;
+  }
+  function removeDragGhost() { if (_dragGhost) { _dragGhost.remove(); _dragGhost = null; } }
+  function handleDragOver(e) {
+    e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+    if (dragIdx < 0) return;
+    const [col, row] = pixelToCell(grid, e.clientX, e.clientY);
+    const size = layout[dragIdx]?.size || 'm';
+    const [cSpan, rSpan] = TILE_SPANS[size] || [2,2];
+    const unit = GRID_SCALES[gridScale] || 42;
+    const ghost = ensureDragGhost();
+    ghost.style.left = ((col - 1) * (unit + GRID_GAP)) + 'px';
+    ghost.style.top = ((row - 1) * (unit + GRID_GAP)) + 'px';
+    ghost.style.width = (cSpan * unit + (cSpan - 1) * GRID_GAP) + 'px';
+    ghost.style.height = (rSpan * unit + (rSpan - 1) * GRID_GAP) + 'px';
+    const fits = canFitAt(col, row, size, dragIdx) && tileAtCell(col, row, dragIdx) < 0;
+    ghost.classList.toggle('invalid', !fits);
+  }
   function handleDrop(e) {
+    removeDragGhost();
     if (dragIdx < 0) return;
     e.preventDefault();
     if (_swapTimer) clearTimeout(_swapTimer);
@@ -2706,7 +2785,11 @@ function bindGridDrop() {
     e.preventDefault();
     const [col, row] = pixelToCell(grid, e.clientX, e.clientY);
     const menu = document.getElementById('ctxMenu');
-    menu.innerHTML = '<div class="ctx-item" onclick="addGroup(' + col + ',' + row + ')">📁 Add Group</div>';
+    menu.innerHTML = '<div class="ctx-item" onclick="addGroup(' + col + ',' + row + ')">📁 Add Group</div>'
+      + '<div class="ctx-sep"></div>'
+      + '<div class="ctx-item" onclick="setGridScale(\'small\')">▫ Small grid</div>'
+      + '<div class="ctx-item" onclick="setGridScale(\'medium\')">◻ Medium grid</div>'
+      + '<div class="ctx-item" onclick="setGridScale(\'large\')">▣ Large grid</div>';
     menu.style.left = Math.min(e.clientX, window.innerWidth - 170) + 'px';
     menu.style.top = Math.min(e.clientY, window.innerHeight - 200) + 'px';
     menu.classList.add('show');
@@ -2723,7 +2806,8 @@ function bindGridDrop() {
 
 // Global: widgets call this to run their parent script with pre-set vars
 window._widgetRun = function(scriptFilename, vars) {
-  const idx = layout.findIndex(l => l.scriptFilename === scriptFilename);
+  let idx = layout.findIndex(l => l.scriptFilename === scriptFilename);
+  if (idx < 0) idx = layout.findIndex(l => { const s = scripts.find(sc => sc._filename === l.scriptFilename); return s && s.name === scriptFilename; });
   if (idx < 0) return;
   const btn = document.querySelector('[data-idx="' + idx + '"]');
   if (btn) runScript(idx, btn, vars);
@@ -2784,8 +2868,8 @@ function showUiStep(ui, vars) {
     if (ui.html) {
       const wrapper = document.createElement('div');
       wrapper.className = 'ui-custom-html';
-      if (ui.width) wrapper.style.width = ui.width + 'px';
-      if (ui.height) wrapper.style.height = ui.height + 'px';
+      if (ui.width) wrapper.style.maxWidth = Math.min(ui.width, window.innerWidth - 48) + 'px';
+      if (ui.height) wrapper.style.maxHeight = Math.min(ui.height, window.innerHeight * 0.6) + 'px';
       wrapper.innerHTML = ui.html;
       container.appendChild(wrapper);
 
@@ -3050,7 +3134,7 @@ function showContextMenu(e, idx) {
     + '<div class="ctx-sep"></div>'
     + '<div class="ctx-item" onclick="showHelpGuide(' + idx + ')">📖 Help Guide</div>'
     + '<div class="ctx-item" onclick="detachTile(' + idx + ')">🔗 Detach (floating)</div>'
-    + (isCustomScript(idx) ? '<div class="ctx-sep"></div><div class="ctx-item" onclick="submitToCommunity(' + idx + ')">🌐 Submit to Community</div>' : '')
+    + (isCustomScript(idx) && !isStoreScript(idx) ? '<div class="ctx-sep"></div><div class="ctx-item" onclick="submitToCommunity(' + idx + ')">🌐 Submit to Community</div>' : '')
     + '<div class="ctx-sep"></div>'
     + '<div class="ctx-item danger" onclick="removeButton(' + idx + ')">🗑 Remove</div>';
   menu.classList.add('show');
@@ -3077,6 +3161,23 @@ function setTileSize(idx, size) {
 }
 
 function hideCtxMenu() { document.getElementById('ctxMenu').classList.remove('show'); }
+
+function repairWithAI(idx) {
+  hideCtxMenu();
+  const item = layout[idx];
+  if (!item) return;
+  const script = scripts.find(s => s._filename === item.scriptFilename);
+  if (!script) { showToast('Script not found', 'error'); return; }
+  const json = JSON.stringify({ name: script.name, steps: script.steps }, null, 2);
+  const prompt = `This RiveBar script has errors or doesn't work correctly. Please analyze it, fix any issues (wrong tool names, bad args, missing steps, syntax errors), and return the corrected full script JSON.\n\nScript:\n${json}`;
+  // Switch to AI chat tab and send
+  const aiBtn = document.querySelector('[onclick*="aichat"]');
+  if (aiBtn) proSwitchTab('aichat', aiBtn);
+  setTimeout(() => {
+    const input = document.getElementById('aiInput');
+    if (input) { input.value = prompt; aiSend(); }
+  }, 150);
+}
 
 function showHelpGuide(idx) {
   hideCtxMenu();
@@ -3122,7 +3223,10 @@ async function detachTile(idx) {
     icon: script?.icon || 'zap',
     category: script?.category || 'utility',
     color: item.color || '#5f33ff',
-    scriptFilename: item.scriptFilename
+    scriptFilename: item.scriptFilename,
+    display: item.display || 'icon',
+    widgetHtml: script?.widget || null,
+    size: item.size || 'm'
   };
   if (detachedTiles.includes(item.scriptFilename)) { showToast('Already detached', 'info'); return; }
   const ok = await window.api.floating.detachOne(tile);
@@ -3161,6 +3265,13 @@ function isCustomScript(idx) {
   if (!item || item.type === 'group') return false;
   const script = scripts.find(s => s._filename === item.scriptFilename);
   return script && !script._isDefault;
+}
+
+function isStoreScript(idx) {
+  const item = layout[idx];
+  if (!item || item.type === 'group') return false;
+  const script = scripts.find(s => s._filename === item.scriptFilename);
+  return script && !!script.storeId;
 }
 
 async function submitToCommunity(idx) {
@@ -3252,6 +3363,23 @@ function editButton(idx) {
     wField.style.display = this.value === 'widget' ? '' : 'none';
   };
 
+  // Help Guide
+  document.getElementById('editHelpGuide').value = script?.helpGuide || '';
+
+  // Preview image
+  const editThumb = document.getElementById('editPreviewThumb');
+  const editFileInput = document.getElementById('editPreviewFile');
+  editFileInput.value = '';
+  if (script?.previewImage) { editThumb.src = script.previewImage; editThumb.style.display = 'block'; }
+  else { editThumb.style.display = 'none'; }
+  editFileInput.onchange = function() {
+    const file = this.files[0];
+    if (!file) { editThumb.style.display = 'none'; return; }
+    const reader = new FileReader();
+    reader.onload = () => { editThumb.src = reader.result; editThumb.style.display = 'block'; };
+    reader.readAsDataURL(file);
+  };
+
   document.getElementById('editModal').classList.add('show');
 }
 
@@ -3310,6 +3438,12 @@ function saveEdit() {
   if (script) {
     if (item.displayMode === 'widget' && widgetVal) { script.widget = widgetVal; }
     else { delete script.widget; }
+    // Help Guide
+    const hg = document.getElementById('editHelpGuide').value.trim();
+    if (hg) script.helpGuide = hg; else delete script.helpGuide;
+    // Preview image
+    const editThumb = document.getElementById('editPreviewThumb');
+    if (editThumb.style.display !== 'none' && editThumb.src) script.previewImage = editThumb.src;
     window.api.scripts.save(script);
   }
 
@@ -3375,7 +3509,7 @@ async function importScripts() {
   if (imported.length) {
     for (const s of imported) {
       scripts.push(s);
-      layout.push({ scriptFilename: s._filename, size: 'm', color: COLORS[layout.length % COLORS.length], icon: ICON_KEYS[layout.length % ICON_KEYS.length], order: layout.length });
+      layout.push({ scriptFilename: s._filename, size: s.size || 'm', color: COLORS[layout.length % COLORS.length], icon: s.icon || ICON_KEYS[layout.length % ICON_KEYS.length], displayMode: s.display || 'both', order: layout.length });
     }
     window.api.layout.save(layout);
     renderGrid();
@@ -3439,7 +3573,7 @@ appEl.addEventListener('drop', async (e) => {
         }
         if (!scripts.some(ex => ex._filename === s._filename)) scripts.push(s);
         if (!layout.some(l => l.scriptFilename === s._filename)) {
-          layout.push({ scriptFilename: s._filename, size: 'm', color: COLORS[layout.length % COLORS.length], icon: ICON_KEYS[layout.length % ICON_KEYS.length], order: layout.length });
+          layout.push({ scriptFilename: s._filename, size: s.size || 'm', color: COLORS[layout.length % COLORS.length], icon: s.icon || ICON_KEYS[layout.length % ICON_KEYS.length], displayMode: s.display || 'both', order: layout.length });
           added = true;
         }
       }
@@ -3781,6 +3915,8 @@ async function installStoreItem(id) {
   if (!scriptData) scriptData = { name: item.title, steps: item.steps || [] };
   if (!scriptData.name) scriptData.name = item.title;
   if (!scriptData.description && item.description) scriptData.description = item.description;
+  if (item.widget && !scriptData.widget) scriptData.widget = item.widget;
+  if (item.display && !scriptData.display) scriptData.display = item.display;
   scriptData.storeId = id;
   scriptData.storeVersion = item.version || item.updatedAt || null;
   // Deobfuscate if needed
@@ -4112,9 +4248,15 @@ window.api.updater.onStatus((data) => {
       banner.style.background = 'rgba(239,68,68,0.15)';
       banner.style.borderColor = 'var(--red, #ef4444)';
       msg.style.color = 'var(--red, #ef4444)';
-      msg.textContent = `Update error: ${data.message}`;
+      msg.textContent = 'Auto-update failed — ';
+      const dl = document.createElement('a');
+      dl.href = 'https://github.com/mysteropodes/rivebar/releases/latest';
+      dl.textContent = 'Download latest version manually';
+      dl.style.cssText = 'color:#8b83ff;text-decoration:underline;cursor:pointer;';
+      dl.onclick = (e) => { e.preventDefault(); window.api.shell.openExternal(dl.href); };
+      msg.appendChild(dl);
       action.textContent = '';
-      if (status) status.textContent = `Update error`;
+      if (status) status.textContent = 'Update failed — manual download needed';
       break;
   }
 });
@@ -4244,7 +4386,7 @@ function proSetupPresetDrop() {
         const data = JSON.parse(text);
         const items = Array.isArray(data) ? data : [data];
         for (const item of items) {
-          if (item.steps || item.name) { proPresets.push({ name: item.name || item.title || file.name.replace('.json', ''), steps: item.steps || [], ...( item.description ? { description: item.description } : {}), ...( item.publishedId ? { publishedId: item.publishedId } : {}) }); count++; }
+          if (item.steps || item.name) { const p = { name: item.name || item.title || file.name.replace('.json', ''), steps: item.steps || [] }; for (const k of ['description','icon','category','tags','hasUi','size','display','widget','publishedId','storeId']) { if (item[k] !== undefined) p[k] = item[k]; } proPresets.push(p); count++; }
         }
       } catch { showToast('Invalid JSON: ' + file.name, 'error'); }
     }
@@ -4827,10 +4969,11 @@ async function proAddToToolbar(idx) {
   const p = proPresets[idx];
   if (!p) return;
   const scriptData = { name: p.name || 'Untitled', description: p.description || '', steps: p.steps || [], hasUi: (p.steps||[]).some(s => s.tool === '_ui'), icon: p.icon, category: p.category, helpGuide: p.helpGuide };
+  if (p.widget) scriptData.widget = p.widget;
   const fname = await window.api.scripts.save(scriptData);
   scriptData._filename = fname;
   scripts.push(scriptData);
-  layout.push({ scriptFilename: fname, size: 'm', color: COLORS[layout.length % COLORS.length], icon: p.icon || 'bolt', order: layout.length });
+  layout.push({ scriptFilename: fname, size: p.size || 'm', color: COLORS[layout.length % COLORS.length], icon: p.icon || 'bolt', displayMode: p.display || 'both', order: layout.length });
   await window.api.layout.save(layout);
   renderGrid();
   showToast(`"${p.name || 'Untitled'}" added to toolbar`, 'success');
@@ -5041,6 +5184,7 @@ function proRenderSteps() {
         <button class="pro-btn-sm" onclick="proDupStep(${i})" title="Dup">⧉</button>
         <button class="pro-btn-sm" onclick="proCopyStep(${i})" title="Copy step">📋</button>
         <button class="pro-btn-sm" onclick="proExplainStep(${i})" title="Explain this step">?</button>
+        <button class="pro-btn-sm" onclick="proRepairStep(${i})" title="Repair with AI" style="font-size:10px;">🔧</button>
         <button class="pro-btn-sm" onclick="proRemoveStep(${i})" title="Remove">✕</button>
       </div>
       ${cmdHtml}
@@ -5140,6 +5284,59 @@ ${step.toastType ? '- Toast type: ' + step.toastType : ''}`;
     helpDiv.innerHTML = `<span class="pro-help-text">${escHtml(clean)}</span><button class="pro-help-close" onclick="this.parentElement.remove()">✕</button>`;
   } catch (e) {
     helpDiv.innerHTML = `<span class="pro-help-text" style="color:var(--error)">Erreur: ${escHtml(e.message)}</span><button class="pro-help-close" onclick="this.parentElement.remove()">✕</button>`;
+  }
+}
+
+async function proRepairStep(idx) {
+  const p = proPresets[proCurrentIdx];
+  if (!p) return;
+  const step = p.steps[idx];
+  if (!step) return;
+  const stepEl = document.querySelectorAll('.pro-step')[idx];
+  if (!stepEl) return;
+  let helpDiv = stepEl.querySelector('.pro-step-help');
+  if (helpDiv) helpDiv.remove();
+  helpDiv = document.createElement('div');
+  helpDiv.className = 'pro-step-help';
+  helpDiv.innerHTML = '<span class="pro-help-loading">🔧 Repairing…</span>';
+  stepEl.appendChild(helpDiv);
+  try {
+    const contextSteps = p.steps.map((s, i) => `Step ${i+1}: [${s.tool}] ${s.label || ''} → ${typeof s.args === 'string' ? s.args.slice(0,120) : JSON.stringify(s.args||{}).slice(0,120)}`).join('\n');
+    const prompt = `You are a RiveBar script repair assistant. Analyze this step and fix any issues (wrong tool name, bad JSON args, incorrect _compute code, missing extract, bad interpolation).
+
+Script "${p.name || 'Untitled'}" context:
+${contextSteps}
+
+Step #${idx+1} to repair:
+- Tool: ${step.tool}
+- Args: ${typeof step.args === 'string' ? step.args : JSON.stringify(step.args || {})}
+${step.label ? '- Label: ' + step.label : ''}
+${step.ui ? '- UI: ' + JSON.stringify(step.ui) : ''}
+${step.extract ? '- Extract: ' + JSON.stringify(step.extract) : ''}
+
+RULES:
+- _compute args must be JavaScript code string, NOT JSON
+- Use only real MCP tools: list_artboards, find_objects, get_selection, set_property_values, rename_objects, path_editor, animation_editor, etc.
+- results[N] is raw JSON string — always JSON.parse() it
+- Use {{var}} for string interpolation, {{json:var}} for objects/arrays
+
+Return ONLY a valid JSON object for the repaired step (with tool, args, label, extract if needed). No explanation, no markdown fences.`;
+
+    const messages = [{ role: 'user', parts: [{ text: prompt }] }];
+    const response = await aiCallAPI(messages);
+    let repaired;
+    const jsonMatch = response.match(/```json\s*([\s\S]*?)```/) || response.match(/```\s*([\s\S]*?)```/);
+    const raw = jsonMatch ? jsonMatch[1].trim() : response.trim();
+    try { repaired = JSON.parse(raw); } catch { repaired = JSON.parse(JSONRepair.jsonrepair(raw)); }
+    if (repaired.tool) p.steps[idx].tool = repaired.tool;
+    if (repaired.args !== undefined) p.steps[idx].args = typeof repaired.args === 'string' ? repaired.args : JSON.stringify(repaired.args);
+    if (repaired.label) p.steps[idx].label = repaired.label;
+    if (repaired.extract) p.steps[idx].extract = repaired.extract;
+    if (repaired.ui) p.steps[idx].ui = repaired.ui;
+    proSave(); proRenderSteps();
+    showToast('Step #' + (idx+1) + ' repaired ✓', 'success');
+  } catch (e) {
+    helpDiv.innerHTML = `<span class="pro-help-text" style="color:var(--error)">Repair failed: ${escHtml(e.message)}</span><button class="pro-help-close" onclick="this.parentElement.remove()">✕</button>`;
   }
 }
 
@@ -5535,6 +5732,8 @@ When the user asks to create a Luau script, generate a RiveBar JSON workflow tha
 let aiChats = [];
 let aiCurrentChat = -1;
 let aiStreaming = false;
+let aiAbortCtrl = null;
+let aiAttachments = [];
 let aiSettings = { provider: 'gemini', apiKey: '', apiKeys: {} };
 let aiLocalProviders = []; // [{id,name,baseUrl,models:[]}]
 
@@ -6127,9 +6326,24 @@ function aiFixScript(raw) {
     // ── path_editor ──
     if (step.tool === 'path_editor') {
       if (args.action && !args.command) { args.command = args.action; delete args.action; }
-      // Fix singular createShape → createShapes
-      if (args.command === 'createShape') args.command = 'createShapes';
-      // If command is invalid or missing, and there's shape-like data, wrap it
+      // Alias mapping for common LLM mistakes
+      const peAliases = {
+        createShape:'createShapes', create_shape:'createShapes', create_shapes:'createShapes',
+        addPath:'addPaths', add_path:'addPaths', add_paths:'addPaths',
+        addPaint:'addPaints', add_paint:'addPaints', add_paints:'addPaints',
+        addVertex:'addVertices', add_vertex:'addVertices', add_vertices:'addVertices',
+        getVertices:'addVertices', get_vertices:'addVertices',
+        setVertices:'addVertices', set_vertices:'addVertices',
+        editPath:'addPaths', edit_path:'addPaths',
+        editVertices:'addVertices', edit_vertices:'addVertices',
+        modifyPath:'addPaths', modify_path:'addPaths', modify_paths:'addPaths',
+        modifyShape:'createShapes', modifyShapes:'createShapes', modify_shapes:'createShapes',
+        updateVertices:'addVertices', update_vertices:'addVertices',
+        updatePath:'addPaths', update_path:'addPaths', update_paths:'addPaths',
+        flipPath:'addPaths', flip_path:'addPaths',
+        transformPath:'addPaths', transform_path:'addPaths',
+      };
+      if (args.command && peAliases[args.command]) args.command = peAliases[args.command];
       const validPECmds = new Set(['createShapes','addPaths','addPaints','addVertices']);
       if (!validPECmds.has(args.command)) {
         // LLM gave simplified shape args like {type:"rect", width, height, color}
@@ -6713,6 +6927,17 @@ function aiFixScript(raw) {
     return true;
   });
 
+  // Deduplicate consecutive identical steps (e.g. 2x list_artboards with same args)
+  s.steps = s.steps.filter((st, idx) => {
+    if (idx === 0) return true;
+    const prev = s.steps[idx - 1];
+    if (st.tool === prev.tool && JSON.stringify(st.args) === JSON.stringify(prev.args)) {
+      if (st.extract) { for (const [k,v] of Object.entries(st.extract)) { if (!prev.extract) prev.extract = {}; prev.extract[k] = v; } }
+      return false;
+    }
+    return true;
+  });
+
   // Limit repeated same-tool calls (e.g. 5x animation_editor with same command)
   const toolRunCounts = {};
   s.steps = s.steps.filter(st => {
@@ -6721,6 +6946,17 @@ function aiFixScript(raw) {
     if (toolRunCounts[key] > 2) return false;
     return true;
   });
+
+  // ── find_objects with {selected:true} or {query:"selected"} → get_selection ──
+  for (const step of s.steps) {
+    if (step.tool === 'find_objects') {
+      const a = typeof step.args === 'string' ? step.args : JSON.stringify(step.args);
+      if (/selected\s*["']?\s*:\s*true|"query"\s*:\s*["']\s*selected\s*["']/i.test(a)) {
+        step.tool = 'get_selection';
+        step.args = '{}';
+      }
+    }
+  }
 
   // ── Fix results[N] indices in _compute steps ──
   // LLMs often use wrong indices. Fix: each _compute doing JSON.parse(results[N])
@@ -6738,6 +6974,101 @@ function aiFixScript(raw) {
       }
     }
   }
+
+  // ── Fix _compute accessing wrong properties from find_objects/get_selection results ──
+  for (let i = 0; i < s.steps.length; i++) {
+    const st = s.steps[i];
+    if (st.tool === '_compute' && typeof st.args === 'string') {
+      // Fix d.shapeIds / d.shape_ids / d.ids / d.selectedIds → (d.objects||d.selection||[])
+      st.args = st.args.replace(/(\w+)\.(shapeIds|shape_ids|selectedIds|selected_ids|objectIds|object_ids|ids)(?!\s*=)/g,
+        (m, obj, prop) => `(${obj}.objects||${obj}.selection||[])`);
+      // Fix .forEach/.map/.length on something that might be objects wrapper
+      st.args = st.args.replace(/(\w+)\.objects\.forEach/g, '($1.objects||[]).forEach');
+      st.args = st.args.replace(/(\w+)\.objects\.map/g, '($1.objects||[]).map');
+      st.args = st.args.replace(/(\w+)\.objects\.length/g, '($1.objects||[]).length');
+    }
+  }
+
+  // ── Fix bare "return X" in _compute → remove return (only simple values, not objects/arrays) ──
+  for (const step of s.steps) {
+    if (step.tool === '_compute' && typeof step.args === 'string') {
+      // Only replace return with simple expressions (not { or [ which span multiple lines)
+      step.args = step.args.replace(/\breturn\s+([^;{[\n]+);?/g, (_, expr) => {
+        const trimmed = expr.trim();
+        if (!trimmed || trimmed === 'undefined') return '';
+        return `setVar('result', ${trimmed});`;
+      });
+      // Remove bare "return;" or "return\n"
+      step.args = step.args.replace(/\breturn\s*[;\n]/g, '');
+    }
+  }
+
+  // ── Remove _compute steps that use invented APIs ──
+  s.steps = s.steps.filter(st => {
+    if (st.tool === '_compute' && typeof st.args === 'string') {
+      // object.method pattern (rive.getX, rivet.doY, selection.query, editor.update, canvas.draw, document.get)
+      if (/\b(rivet|rive|selection|editor|canvas|document|artboard|Toast)\.\w+\s*\(/.test(st.args)) return false;
+      // Bare invented function calls — camelCase and snake_case MCP tool names used as functions
+      if (/\b(queryPropertyValues|setPropertyValues|getPropertyValues|findObjects|selectObjects|deleteObjects|renameObjects|createShape|getSelection|getArtboard|setProperty|getPath|setPath|updateShape|querySelection|query_property_keys|query_property_values|set_property_values|find_objects|get_selection|select_objects|delete_objects|rename_objects|list_artboards|get_artboard_hierarchy|path_editor|animation_editor|layout_editor|open_file_editor|reparent_objects|reorder_objects|duplicate_objects|text_editor|viewmodel_editor|component_editor|manage_scripts|get_scripts)\s*\(/.test(st.args)) return false;
+    }
+    return true;
+  });
+
+  // ── Fix _toast args with extra surrounding quotes ──
+  for (const step of s.steps) {
+    if (step.tool === '_toast' && typeof step.args === 'string') {
+      // Remove wrapping quotes: "\"message\"" → message
+      step.args = step.args.replace(/^"(.*)"$/, '$1').replace(/^'(.*)'$/, '$1');
+    }
+  }
+
+  // ── Fix extract with [*] syntax → [0] (collect-all not supported, take first) ──
+  for (const step of s.steps) {
+    if (step.extract) {
+      for (const [k, v] of Object.entries(step.extract)) {
+        if (typeof v === 'string' && v.includes('[*]')) {
+          step.extract[k] = v.replace(/\[\*\]/g, '[0]');
+        }
+      }
+    }
+  }
+
+  // ── Validate _compute syntax — remove steps with broken JS ──
+  s.steps = s.steps.filter(st => {
+    if (st.tool === '_compute' && typeof st.args === 'string') {
+      try { new Function('vars', 'results', 'setVar', 'toast', st.args); }
+      catch (e) { return false; }
+    }
+    return true;
+  });
+
+  // ── Detect unreferenced {{vars}} in tool steps and remove those steps ──
+  const definedVarNames = new Set();
+  for (let i = 0; i < s.steps.length; i++) {
+    const st = s.steps[i];
+    // Collect vars from extract
+    if (st.extract) for (const k of Object.keys(st.extract)) definedVarNames.add(k);
+    // Collect vars from _compute setVar calls
+    if (st.tool === '_compute' && typeof st.args === 'string') {
+      const svMatches = st.args.matchAll(/setVar\s*\(\s*['"](\w+)['"]/g);
+      for (const m of svMatches) definedVarNames.add(m[1]);
+    }
+    // Collect vars from _ui
+    if (st.tool === '_ui' && st.ui?.html) {
+      const uim = (st.ui.html || '').match(/_uiResolve\(\{([^}]*)\}\)/);
+      if (uim) uim[1].replace(/(\w+)\s*:/g, (_, k) => { definedVarNames.add(k); });
+    }
+    // Check if this step uses {{vars}} that haven't been defined yet
+    if (st.tool && !st.tool.startsWith('_') && typeof st.args === 'string') {
+      const refs = [...st.args.matchAll(/\{\{(?:json:)?(\w+)\}\}/g)].map(m => m[1]);
+      const missing = refs.filter(r => !definedVarNames.has(r));
+      if (missing.length > 0 && refs.length > 0 && missing.length === refs.length) {
+        // ALL vars are missing — this step can't possibly work, mark for removal
+        st._broken = true;
+      }
+    }
+  }
+  s.steps = s.steps.filter(st => !st._broken);
 
   // ── Fix _compute with ui property (should be _ui) ──
   for (const step of s.steps) {
@@ -7221,10 +7552,69 @@ function aiSendSuggestion(el) {
   aiSend();
 }
 
+function aiStop() {
+  if (aiAbortCtrl) { aiAbortCtrl.abort(); aiAbortCtrl = null; }
+  aiStreaming = false;
+  document.getElementById('aiSendBtn').style.display = '';
+  document.getElementById('aiStopBtn').style.display = 'none';
+  document.getElementById('aiSendBtn').disabled = false;
+  const chat = aiChats[aiCurrentChat];
+  if (chat && chat.messages.length) {
+    const last = chat.messages[chat.messages.length - 1];
+    if (last.role === 'assistant' && (last.content.startsWith('⏳') || last.content.startsWith('🔍') || last.content.startsWith('🔄'))) {
+      last.content = '⛔ Interrupted by user.';
+    } else if (last.role === 'assistant') {
+      last.content += '\n\n⛔ _(interrupted)_';
+    }
+    aiRenderMessages();
+  }
+}
+
+function aiAttachFile() { document.getElementById('aiFileInput').click(); }
+
+function aiHandleFiles(files) {
+  for (const f of files) {
+    if (f.size > 5 * 1024 * 1024) { showToast('File too large (max 5MB)', 'error'); continue; }
+    const reader = new FileReader();
+    if (f.type.startsWith('image/')) {
+      reader.onload = () => { aiAttachments.push({ type: 'image', name: f.name, data: reader.result }); aiRenderAttachments(); };
+      reader.readAsDataURL(f);
+    } else {
+      reader.onload = () => { aiAttachments.push({ type: 'json', name: f.name, data: reader.result }); aiRenderAttachments(); };
+      reader.readAsText(f);
+    }
+  }
+  document.getElementById('aiFileInput').value = '';
+}
+
+function aiRenderAttachments() {
+  const el = document.getElementById('aiAttachPreview');
+  if (!aiAttachments.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  el.style.display = 'flex';
+  el.innerHTML = aiAttachments.map((a, i) =>
+    `<span style="display:inline-flex;align-items:center;gap:3px;background:var(--surface2);border-radius:6px;padding:2px 8px;font-size:10px;color:var(--text2);">${a.type === 'image' ? '🖼' : '📄'} ${escHtml(a.name)}<span onclick="aiRemoveAttach(${i})" style="cursor:pointer;color:var(--red,#e55c8a);font-weight:700;margin-left:2px;">✕</span></span>`
+  ).join('');
+}
+
+function aiRemoveAttach(idx) { aiAttachments.splice(idx, 1); aiRenderAttachments(); }
+
 async function aiSend() {
+  if (aiAgentMode) return aiSendAgent();
   const input = document.getElementById('aiInput');
-  const msg = input.value.trim();
+  let msg = input.value.trim();
   if (!msg || aiStreaming) return;
+  // Append attachments to message
+  if (aiAttachments.length) {
+    for (const a of aiAttachments) {
+      if (a.type === 'json') {
+        msg += '\n\n📄 **Attached file: ' + a.name + '**\n```json\n' + a.data + '\n```';
+      } else if (a.type === 'image') {
+        msg += '\n\n🖼 **Attached image: ' + a.name + '** _(base64 image data included)_';
+      }
+    }
+    aiAttachments = [];
+    aiRenderAttachments();
+  }
   if (aiCurrentChat < 0) aiNewChat();
   const chat = aiChats[aiCurrentChat];
   chat.messages.push({ role: 'user', content: msg });
@@ -7242,7 +7632,9 @@ async function aiSend() {
   }
 
   aiStreaming = true;
-  document.getElementById('aiSendBtn').disabled = true;
+  aiAbortCtrl = new AbortController();
+  document.getElementById('aiSendBtn').style.display = 'none';
+  document.getElementById('aiStopBtn').style.display = '';
   const isLocal = (aiSettings.provider || '').startsWith('local:');
   chat.messages.push({ role: 'assistant', content: '🔍 Gathering Rive context...' });
   aiRenderMessages();
@@ -7275,7 +7667,7 @@ async function aiSend() {
 
       let retryPrompt;
       if (retryCount === 1) {
-        retryPrompt = 'The script has errors:\n' + validation.reason + '\n\nYour script after auto-fix still has issues. Please regenerate from scratch. CRITICAL RULES:\n- Use ONLY real MCP tools: path_editor, open_file_editor, list_artboards, find_objects, animation_editor, viewmodel_editor, layout_editor, rename_objects, set_property_values, etc.\n- _compute args must be JavaScript code (NOT JSON)\n- open_file_editor ONLY manages artboards\n- To create shapes use path_editor with command "createShapes"\n- Wrap your script in ```json``` code block';
+        retryPrompt = 'The script has errors:\n' + validation.reason + '\n\nYour script after auto-fix still has issues. Please regenerate from scratch. CRITICAL RULES:\n- Use ONLY real MCP tools: path_editor, open_file_editor, list_artboards, find_objects, animation_editor, viewmodel_editor, layout_editor, rename_objects, set_property_values, etc.\n- _compute args must be JavaScript code (NOT JSON)\n- open_file_editor ONLY manages artboards\n- path_editor ONLY has 4 commands: createShapes, addVertices, addPaths, addPaints — NO modifyShapes, getVertices, setVertices, flipPath etc.\n- To read vertices: use get_selection or find_objects, then path_editor with addVertices\n- find_objects returns {objects:[{id,name,type}]} — NOT path data. Parse it correctly.\n- In _compute, results[N] is a raw JSON string — always JSON.parse() it and check the structure\n- Wrap your script in ```json``` code block';
       } else {
         // 2nd retry: inject a concrete working example matching the intent
         const intents = aiDetectIntent(msg);
@@ -7296,9 +7688,16 @@ async function aiSend() {
     aiUpdateLearnCount();
     chat.messages[chat.messages.length - 1].content = response;
   } catch (e) {
-    chat.messages[chat.messages.length - 1].content = '❌ Error: ' + e.message;
+    if (e.message === 'Interrupted') {
+      chat.messages[chat.messages.length - 1].content = '⛔ Interrupted by user.';
+    } else {
+      chat.messages[chat.messages.length - 1].content = '❌ Error: ' + e.message;
+    }
   }
   aiStreaming = false;
+  aiAbortCtrl = null;
+  document.getElementById('aiSendBtn').style.display = '';
+  document.getElementById('aiStopBtn').style.display = 'none';
   document.getElementById('aiSendBtn').disabled = false;
   aiRenderMessages();
   aiRenderChatList();
@@ -7340,6 +7739,7 @@ function aiDetectIntent(userMsg) {
   if (/text|font|typo|label|paragraph|texte/i.test(lower)) intents.push('text');
   if (/rename|batch|find.*replace|search|renomm/i.test(lower)) intents.push('rename');
   if (/select|sélect|chosen|click/i.test(lower)) intents.push('selection');
+  if (/flip|mirror|miroir|retourner|inverser|symétri|horizontal|vertical|scale.*-/i.test(lower)) intents.push('transform');
   if (/artboard|board|canvas|page|écran|screen/i.test(lower)) intents.push('artboard');
   if (/rouge|bleu|vert|jaune|color|couleur|red|blue|green/i.test(lower) && !intents.includes('shape')) intents.push('shape');
   if (!intents.length) intents.push('general');
@@ -7351,6 +7751,7 @@ const AI_FEWSHOT = {
   animation: '{"name":"Create Timeline","icon":"film","category":"animation","tags":["animation","timeline"],"hasUi":true,"steps":[{"tool":"list_artboards","args":"{}","extract":{"artboardId":"artboards[?isActive].id"},"label":"Get artboard"},{"tool":"_ui","ui":{"title":"Timeline","width":300,"html":"<div style=\'padding:8px;display:flex;flex-direction:column;gap:10px;\'><label style=\'font-size:11px;color:#aaa;\'>Name<br><input id=\'n\' type=\'text\' value=\'MyTimeline\' style=\'width:100%;padding:6px;background:#1a1a2e;border:1px solid rgba(255,255,255,0.12);color:#e0e0e0;border-radius:6px;\'></label><div style=\'display:flex;gap:8px;justify-content:flex-end;\'><button onclick=\\"window._uiReject()\\" style=\'padding:8px 12px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:transparent;color:#aaa;cursor:pointer;\'>Cancel</button><button onclick=\\"window._uiResolve({name:document.getElementById(\'n\').value})\\" style=\'padding:8px 12px;border-radius:6px;border:none;background:#5f33ff;color:white;cursor:pointer;\'>Create</button></div></div>"},"label":"Config"},{"tool":"animation_editor","args":"{ \\"command\\": \\"createLinearAnimations\\", \\"data\\": { \\"createLinearAnimations\\": { \\"artboardId\\": \\"{{artboardId}}\\", \\"linearAnimations\\": [{ \\"name\\": \\"{{name}}\\" }] } } }","label":"Create timeline"},{"tool":"_toast","args":"Timeline \'{{name}}\' created ✓","toastType":"success"}]}',
   shape: '{"name":"Red Square","icon":"layers","category":"design","tags":["shape","square","rectangle"],"hasUi":false,"steps":[{"tool":"list_artboards","args":"{}","extract":{"artboardId":"artboards[?isActive].id"},"label":"Get artboard"},{"tool":"path_editor","args":"{ \\"command\\": \\"createShapes\\", \\"data\\": { \\"createShapes\\": { \\"shapes\\": [{ \\"name\\": \\"Square\\", \\"x\\": 0, \\"y\\": 0, \\"paints\\": [{ \\"paintType\\": \\"fill\\", \\"color\\": \\"#FFFF0000\\" }], \\"paths\\": [{ \\"name\\": \\"Path\\", \\"commands\\": [{ \\"commandType\\": \\"moveTo\\", \\"x\\": -400, \\"y\\": -400 },{ \\"commandType\\": \\"lineTo\\", \\"x\\": 400, \\"y\\": -400 },{ \\"commandType\\": \\"lineTo\\", \\"x\\": 400, \\"y\\": 400 },{ \\"commandType\\": \\"lineTo\\", \\"x\\": -400, \\"y\\": 400 },{ \\"commandType\\": \\"close\\" }] }], \\"parentId\\": \\"{{artboardId}}\\" }] } } }","label":"Create square"},{"tool":"_toast","args":"Square created ✓","toastType":"success"}]}',
   artboard: '{"name":"Quick Artboard","icon":"artboard","category":"design","tags":["artboard","create"],"hasUi":true,"steps":[{"tool":"_ui","ui":{"title":"New Artboard","width":350,"html":"<div style=\'display:flex;flex-direction:column;gap:10px;padding:8px;\'><label style=\'font-size:11px;color:#aaa;\'>Name<br><input id=\'n\' type=\'text\' value=\'Screen 1\' style=\'width:100%;padding:6px;background:#1a1a2e;border:1px solid rgba(255,255,255,0.12);color:#e0e0e0;border-radius:6px;\'></label><div style=\'display:flex;gap:8px;\'><label style=\'flex:1;font-size:11px;color:#aaa;\'>Width<br><input id=\'w\' type=\'number\' value=\'375\' style=\'width:100%;padding:6px;background:#1a1a2e;border:1px solid rgba(255,255,255,0.12);color:#e0e0e0;border-radius:6px;\'></label><label style=\'flex:1;font-size:11px;color:#aaa;\'>Height<br><input id=\'h\' type=\'number\' value=\'812\' style=\'width:100%;padding:6px;background:#1a1a2e;border:1px solid rgba(255,255,255,0.12);color:#e0e0e0;border-radius:6px;\'></label></div><div style=\'display:flex;gap:8px;justify-content:flex-end;\'><button onclick=\\"window._uiReject()\\" style=\'padding:8px 12px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:transparent;color:#aaa;cursor:pointer;\'>Cancel</button><button onclick=\\"window._uiResolve({name:document.getElementById(\'n\').value,width:Number(document.getElementById(\'w\').value),height:Number(document.getElementById(\'h\').value)})\\" style=\'padding:8px 12px;border-radius:6px;border:none;background:#5f33ff;color:white;cursor:pointer;\'>Create</button></div></div>"},"label":"Config"},{"tool":"open_file_editor","args":"{ \\"command\\": \\"createArtboard\\", \\"data\\": { \\"createArtboard\\": [{ \\"name\\": \\"{{name}}\\", \\"width\\": {{width}}, \\"height\\": {{height}} }] } }","label":"Create artboard"},{"tool":"_toast","args":"Created {{name}} ({{width}}×{{height}})","toastType":"success"}]}',
+  transform: '{"name":"Flip Horizontal","icon":"flip","category":"design","tags":["flip","mirror","transform"],"hasUi":false,"steps":[{"tool":"get_selection","args":"{}","label":"Get selection"},{"tool":"_compute","args":"const sel=JSON.parse(results[0]);const objs=sel.objects||sel.selection||sel;if(!Array.isArray(objs)||!objs.length)throw new Error(\'Select an object first\');const ids=objs.map(o=>o.id);const qk={};ids.forEach(id=>{qk[id]=[4]});setVar(\'ids\',ids);setVar(\'queryKeys\',qk);","label":"Extract IDs"},{"tool":"query_property_values","args":"{ \\"propertyKeys\\": {{json:queryKeys}} }","label":"Get scaleX"},{"tool":"_compute","args":"const ids=vars.ids;const res=JSON.parse(results[2]);const pv={};ids.forEach(id=>{const props=res[id]||{};const sx=props[4]!==undefined?props[4]:1;pv[id]={4:-sx}});setVar(\'propValues\',pv);","label":"Compute flip"},{"tool":"set_property_values","args":"{ \\"propertyValues\\": {{json:propValues}} }","label":"Apply flip"},{"tool":"_toast","args":"Flipped horizontally ✓","toastType":"success"}]}',
   rename: '{"name":"Batch Rename","icon":"edit","category":"utility","tags":["rename"],"hasUi":true,"steps":[{"tool":"_ui","ui":{"title":"Batch Rename","width":350,"html":"<div style=\'display:flex;flex-direction:column;gap:10px;padding:8px;\'><label style=\'font-size:11px;color:#aaa;\'>Find<br><input id=\'s\' type=\'text\' style=\'width:100%;padding:6px;background:#1a1a2e;border:1px solid rgba(255,255,255,0.12);color:#e0e0e0;border-radius:6px;\'></label><label style=\'font-size:11px;color:#aaa;\'>Replace<br><input id=\'r\' type=\'text\' style=\'width:100%;padding:6px;background:#1a1a2e;border:1px solid rgba(255,255,255,0.12);color:#e0e0e0;border-radius:6px;\'></label><div style=\'display:flex;gap:8px;justify-content:flex-end;\'><button onclick=\\"window._uiReject()\\" style=\'padding:8px 12px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:transparent;color:#aaa;cursor:pointer;\'>Cancel</button><button onclick=\\"window._uiResolve({search:document.getElementById(\'s\').value,replace:document.getElementById(\'r\').value})\\" style=\'padding:8px 12px;border-radius:6px;border:none;background:#5f33ff;color:white;cursor:pointer;\'>Rename</button></div></div>"},"label":"Settings"},{"tool":"list_artboards","args":"{}","extract":{"artboardId":"artboards[?isActive].id"},"label":"Get artboard"},{"tool":"find_objects","args":"{ \\"name\\": \\"{{search}}\\" }","label":"Find objects"},{"tool":"_compute","args":"const objs=JSON.parse(results[2]);const arr=Array.isArray(objs)?objs:(objs.objects||[]);if(!arr.length)throw new Error(\'No objects found matching \\\"\'+vars.search+\'\\\"\');const renames=arr.map(o=>({id:o.id,name:o.name.replace(new RegExp(vars.search,\'g\'),vars.replace)}));setVar(\'renames\',renames);setVar(\'count\',String(renames.length));","label":"Build renames"},{"tool":"rename_objects","args":"{ \\"renames\\": {{json:renames}} }","label":"Apply"},{"tool":"_toast","args":"Renamed {{count}} objects ✓","toastType":"success"}]}'
 };
 
@@ -7470,6 +7871,7 @@ async function aiCallAPI(messages, mcpContext) {
 
   async function proxyPost(url, headers, bodyObj) {
     const r = await window.api.ai.proxyFetch({ url, method: 'POST', headers, body: JSON.stringify(bodyObj) });
+    if (aiAbortCtrl && aiAbortCtrl.signal.aborted) throw new Error('Interrupted');
     if (r.error) throw new Error('Network error: ' + r.error);
     if (r.status && r.status >= 400) throw new Error('API error ' + r.status + ' — ' + (r.body || '').slice(0, 200));
     return JSON.parse(r.body);
@@ -7604,7 +8006,8 @@ async function aiRunScript(btn) {
     return div;
   }
 
-  let failed = false;
+  if (!parsed._retryCount) parsed._retryCount = 0;
+  let failed = false, failedStep = -1, failedError = '', failedTool = '';
   for (let i = 0; i < steps.length; i++) {
     const step = steps[i];
 
@@ -7617,10 +8020,11 @@ async function aiRunScript(btn) {
 
     if (step.tool === '_compute') {
       try {
+        const safeRes = new Proxy(results, { get(t, p) { return t[p] ?? '{}'; } });
         const fn = new Function('vars', 'results', 'setVar', 'toast', step.args || '');
-        fn(vars, results, (k, v) => { vars[k] = v; }, showToast);
+        fn(vars, safeRes, (k, v) => { vars[k] = v; }, showToast);
         addLine('_compute', true, 'OK — vars: ' + Object.keys(vars).join(', '));
-      } catch (e) { addLine('_compute', false, e.message); failed = true; break; }
+      } catch (e) { addLine('_compute', false, e.message); failed = true; failedStep = i; failedError = e.message; failedTool = '_compute'; break; }
       continue;
     }
 
@@ -7647,16 +8051,22 @@ async function aiRunScript(btn) {
 
     let args;
     try { args = JSON.parse(resolved); } catch (e) {
-      try { const repaired = JSONRepair.jsonrepair(resolved); args = JSON.parse(repaired); } catch (e2) { addLine(step.tool, false, 'Bad JSON: ' + e.message); failed = true; break; }
+      try { const repaired = JSONRepair.jsonrepair(resolved); args = JSON.parse(repaired); } catch (e2) { addLine(step.tool, false, 'Bad JSON: ' + e.message); failed = true; failedStep = i; failedError = 'Bad JSON: ' + e.message; failedTool = step.tool; break; }
     }
 
     const line = addLine(step.tool, null, 'Running...');
     let res;
     try {
       res = await window.api.mcp.callTool(step.tool, args);
+      // Retry on MCP initialization error (connection not ready)
+      if (res?.error && /before.*initialized|not.*initialized/i.test(String(res.error?.message || res.error))) {
+        line.innerHTML = '<span class="step-icon">⏳</span><strong style="color:var(--accent);font-size:10px;">' + escHtml(step.tool) + '</strong> <span style="color:var(--orange);font-size:10px;">MCP init — retrying...</span>';
+        await new Promise(r => setTimeout(r, 1500));
+        res = await window.api.mcp.callTool(step.tool, args);
+      }
     } catch (e) {
       line.innerHTML = '<span class="step-icon">❌</span><strong style="color:var(--accent);font-size:10px;">' + escHtml(step.tool) + '</strong> <span style="color:var(--red);font-size:10px;">' + escHtml(e.message || 'Tool call failed') + '</span>';
-      failed = true; break;
+      failed = true; failedStep = i; failedError = e.message || 'Tool call failed'; failedTool = step.tool; break;
     }
 
     if (res && !res.error) {
@@ -7666,13 +8076,296 @@ async function aiRunScript(btn) {
       results[i] = text;
       line.innerHTML = '<span class="step-icon">✅</span><strong style="color:var(--accent);font-size:10px;">' + escHtml(step.tool) + '</strong> <span style="color:var(--text2);font-size:10px;word-break:break-all;">' + escHtml(text.slice(0, 200)) + '</span>';
     } else {
-      line.innerHTML = '<span class="step-icon">❌</span><strong style="color:var(--accent);font-size:10px;">' + escHtml(step.tool) + '</strong> <span style="color:var(--red);font-size:10px;">' + escHtml(res?.error || JSON.stringify(res)) + '</span>';
-      failed = true; break;
+      const errMsg = res?.error?.message || res?.error || JSON.stringify(res);
+      line.innerHTML = '<span class="step-icon">❌</span><strong style="color:var(--accent);font-size:10px;">' + escHtml(step.tool) + '</strong> <span style="color:var(--red);font-size:10px;">' + escHtml(String(errMsg)) + '</span>';
+      failed = true; failedStep = i; failedError = String(errMsg); failedTool = step.tool; break;
+    }
+  }
+
+  // ── Runtime retry: send error back to AI to auto-fix the script ──
+  if (failed && failedStep >= 0 && parsed._retryCount < 1 && typeof aiCallAPI === 'function') {
+    parsed._retryCount++;
+    addLine('🔄', null, 'Asking AI to fix the script...');
+    const prevResults = Object.entries(results).map(([k,v]) => 'Step ' + k + ' (' + (steps[k]?.tool||'?') + '): ' + String(v).slice(0, 300)).join('\n');
+    const fixPrompt = 'The script "' + (parsed.name || 'Script') + '" failed at step ' + failedStep + ' (' + failedTool + '):\nError: ' + failedError + '\n\nFailing step: ' + JSON.stringify(steps[failedStep], null, 2) + '\n\nResults from previous steps:\n' + prevResults + '\n\nCRITICAL FIX RULES:\n- path_editor ONLY has 4 commands: createShapes, addVertices, addPaths, addPaints\n- find_objects returns {objects:[{id,name,type}]} — NOT vertices or path data\n- In _compute, results[N] is a raw JSON string — always JSON.parse() it and check structure before accessing properties\n- _compute cannot use bare "return" — use setVar() instead\n- Always check array/object existence before calling .forEach/.map/.length\n\nRegenerate the COMPLETE fixed script as a ```json``` block.';
+    try {
+      const mcpCtx = typeof aiGetMcpContext === 'function' ? await aiGetMcpContext() : '';
+      const fixMessages = [
+        { role: 'user', parts: [{ text: 'Generate a RiveBar script: ' + (parsed.description || parsed.name) }] },
+        { role: 'model', parts: [{ text: '```json\n' + JSON.stringify(parsed, null, 2) + '\n```' }] },
+        { role: 'user', parts: [{ text: fixPrompt }] }
+      ];
+      const fixResp = await aiCallAPI(fixMessages, mcpCtx);
+      const fixMatch = fixResp.match(/```json\s*([\s\S]*?)```/);
+      if (fixMatch) {
+        const fixedScript = aiFixScript(fixMatch[1].trim());
+        const fixedParsed = JSON.parse(fixedScript);
+        if (fixedParsed.steps?.length) {
+          resultsEl.innerHTML = '';
+          addLine('🔄', true, 'Script fixed — re-running...');
+          parsed.steps = fixedParsed.steps;
+          steps.length = 0; fixedParsed.steps.forEach(s => steps.push(s));
+          const newB64 = btoa(unescape(encodeURIComponent(JSON.stringify(fixedParsed))));
+          btn.setAttribute('data-b64', newB64);
+          btn.disabled = false; btn.textContent = '▶ Run';
+          return aiRunScript(btn);
+        }
+      }
+      addLine('🔄', false, 'AI could not fix the script');
+    } catch (retryErr) {
+      addLine('🔄', false, 'Retry failed: ' + retryErr.message);
     }
   }
 
   if (!failed) showToast('Script "' + (parsed.name || 'AI Script') + '" completed ✓', 'success');
   btn.disabled = false; btn.textContent = '▶ Run';
+}
+
+// ═══════════���══════════════════════════════��═══════════════════
+// ── AGENT MODE: AI calls MCP tools directly in a loop ──
+// ═══════════════════════════════════════════════���══════════════
+
+let aiAgentMode = false;
+
+function aiToggleAgentMode() {
+  aiAgentMode = !aiAgentMode;
+  const btn = document.getElementById('aiAgentToggle');
+  btn.style.background = aiAgentMode ? 'var(--accent)' : 'transparent';
+  btn.style.color = aiAgentMode ? 'white' : 'var(--text2)';
+  btn.title = aiAgentMode ? 'Agent Mode ON — AI calls tools directly' : 'Agent Mode OFF — generates scripts';
+  document.getElementById('aiInput').placeholder = aiAgentMode ? 'Ask the AI to do something in Rive directly...' : 'Describe the script you want...';
+}
+
+const AI_AGENT_SYSTEM = `You are RiveBar Agent, an AI that directly controls Rive via MCP tools. You call tools one at a time, see the results, and decide what to do next.
+
+## How you work
+- You receive a user request and call MCP tools to fulfill it
+- After each tool call, you see the result and decide the next action
+- When done, respond with a final message (no tool call)
+- If something fails, try an alternative approach
+
+## Tool calling format
+To call a tool, respond with EXACTLY this format (no other text before it):
+\`\`\`tool
+{"tool": "tool_name", "args": { ... }}
+\`\`\`
+
+To finish (no more tools to call), just respond with normal text.
+
+## Available MCP tools
+
+### Artboards
+- list_artboards {} → {artboards:[{id, name, isActive, width, height}]}
+- open_file_editor {command:"createArtboard", data:{createArtboard:[{name, width, height}]}}
+- get_artboard_hierarchy {artboardId:"id"} → full node tree
+
+### Objects
+- find_objects {name:"query"} or {type:"Shape"} → {objects:[{id, name, type, parentId}]}
+- get_selection {} → {objects:[{id, name, type}]} or {selection:[...]}
+- select_objects {objectIds:["id1","id2"]}
+- set_property_values {propertyValues:{"objId":{4:scaleX, 5:scaleY, 13:x, 14:y, 15:rotation, 18:opacity}}}
+- query_property_keys {objectIds:["id"]} → available property keys (integers)
+- query_property_values {propertyKeys:{"objId":[4,5,13,14]}} → {objId:{4:val,5:val,...}}
+- delete_objects {objectIds:["id"]}
+- rename_objects {renames:[{id:"id", name:"new name"}]}
+- duplicate_objects {objectIds:["id"]} → [{originalId, newId}]
+- reparent_objects {operations:[{objectId:"id", newParentId:"pid"}]}
+- reorder_objects {operations:[{objectId:"id", order:"sendToFront"|"bringForward"|"sendBackward"|"sendToBack"}]}
+
+### Design
+- path_editor {command:"createShapes", data:{createShapes:{shapes:[{name,x,y,paints:[{paintType:"fill",color:"#AARRGGBB"}],paths:[{name:"Path",commands:[{commandType:"moveTo",x,y},...]}],parentId:"artboardId"}]}}}
+- path_editor {command:"addVertices", data:{addVertices:{...}}}
+- text_editor {command:"createText", data:{createText:{artboardId:"id", texts:[{name,x,y,text,fontSize}]}}}
+- layout_editor {command:"createLayouts", data:{createLayouts:{artboardId:"id", layouts:[{name, layoutType:"row"|"column"}]}}}
+
+### Animation
+- animation_editor {command:"createLinearAnimations", data:{createLinearAnimations:{artboardId:"id", linearAnimations:[{name}]}}}
+- animation_editor {command:"queryKeyFrames", data:{queryKeyFrames:{selectedKeyFramesOnly:true}}}
+- animation_editor {command:"modifyKeyFrames", data:{modifyKeyFrames:{animationId:"id", change:[{keyframeId,interpolationType:"cubic",cubicParams:{x1,y1,x2,y2}}]}}}
+
+### Data
+- viewmodel_editor {command:"list"} or {command:"create", data:{...}}
+
+### Scripting
+- manage_scripts {command:"create", data:{create:{name:"...", code:"...", type:"node"}}}
+- get_scripts {}
+
+## Key property IDs (for set_property_values / query_property_values)
+4=scaleX, 5=scaleY, 13=x, 14=y, 15=rotation, 18=opacity, 7=width, 8=height
+
+## Important rules
+- Call ONE tool at a time, wait for the result
+- Always check results before proceeding
+- For flipping: set scaleX to -scaleX via set_property_values
+- For moving: set x/y via set_property_values
+- get_selection returns the currently selected objects — use this for "selected path" requests
+- NEVER invent tools or APIs — only use the tools listed above
+- When done, give a short confirmation message
+`;
+
+const AGENT_MAX_TURNS = 15;
+const AGENT_COMPACT_AFTER = 8;
+
+function agentCompactHistory(history) {
+  if (history.length <= AGENT_COMPACT_AFTER) return history;
+  const keep = 3;
+  const toCompact = history.slice(0, history.length - keep);
+  const kept = history.slice(history.length - keep);
+  const summary = toCompact.map(h => {
+    if (h.role === 'user') return '[User] ' + h.content.slice(0, 80);
+    if (h.role === 'tool') return '[Tool ' + (h.toolName || '?') + '] ' + h.content.slice(0, 150);
+    if (h.role === 'assistant' && h.toolCall) return '[Agent→' + h.toolCall.tool + '] args: ' + JSON.stringify(h.toolCall.args).slice(0, 100);
+    return '[Agent] ' + (h.content || '').slice(0, 100);
+  }).join('\n');
+  return [{ role: 'system', content: '## Conversation summary (compacted)\n' + summary }, ...kept];
+}
+
+async function aiAgentCall(messages) {
+  const provider = aiSettings.provider || 'gemini';
+  const apiKey = aiSettings.apiKeys?.[provider] || aiSettings.apiKey || '';
+
+  async function proxyPost(url, headers, bodyObj) {
+    const r = await window.api.ai.proxyFetch({ url, method: 'POST', headers, body: JSON.stringify(bodyObj) });
+    if (r.error) throw new Error('Network error: ' + r.error);
+    if (r.status && r.status >= 400) throw new Error('API error ' + r.status + ' — ' + (r.body || '').slice(0, 300));
+    return JSON.parse(r.body);
+  }
+
+  // Build messages in OpenAI format (most providers support this)
+  const sysMsgs = [{ role: 'system', content: AI_AGENT_SYSTEM }];
+  const chatMsgs = messages.map(m => {
+    if (m.role === 'system') return { role: 'system', content: m.content };
+    if (m.role === 'tool') return { role: 'user', content: '[Tool result for ' + (m.toolName || '?') + ']:\n' + m.content };
+    if (m.role === 'assistant') return { role: 'assistant', content: m.content || (m.toolCall ? '```tool\n' + JSON.stringify(m.toolCall) + '\n```' : '') };
+    return { role: 'user', content: m.content };
+  });
+  const allMsgs = [...sysMsgs, ...chatMsgs];
+
+  if (provider === 'gemini') {
+    const contents = allMsgs.slice(1).map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }));
+    const body = { system_instruction: { parts: [{ text: AI_AGENT_SYSTEM }] }, contents, generationConfig: { temperature: 0.2, maxOutputTokens: 4096 } };
+    const data = await proxyPost('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=' + apiKey, { 'Content-Type': 'application/json' }, body);
+    if (!data.candidates?.[0]) throw new Error('No response from Gemini');
+    return data.candidates[0].content.parts.map(p => p.text).join('');
+  }
+
+  // OpenAI-compatible (groq, cerebras, mistral, openai, local)
+  let url, model, headers = { 'Content-Type': 'application/json' };
+  if (provider === 'groq') { url = 'https://api.groq.com/openai/v1/chat/completions'; model = 'llama-3.3-70b-versatile'; headers['Authorization'] = 'Bearer ' + apiKey; }
+  else if (provider === 'cerebras') { url = 'https://api.cerebras.ai/v1/chat/completions'; model = 'llama-4-scout-17b-16e-instruct'; headers['Authorization'] = 'Bearer ' + apiKey; }
+  else if (provider === 'mistral') { url = 'https://api.mistral.ai/v1/chat/completions'; model = 'mistral-small-latest'; headers['Authorization'] = 'Bearer ' + apiKey; }
+  else if (provider === 'openai') { url = 'https://api.openai.com/v1/chat/completions'; model = 'gpt-4o-mini'; headers['Authorization'] = 'Bearer ' + apiKey; }
+  else if (provider.startsWith('local:')) { url = (aiSettings.localBaseUrl || 'http://127.0.0.1:1234') + '/v1/chat/completions'; model = aiSettings.localModel || 'local'; if (apiKey) headers['Authorization'] = 'Bearer ' + apiKey; }
+  else throw new Error('Provider not supported for agent mode');
+
+  const data = await proxyPost(url, headers, { model, messages: allMsgs, temperature: 0.2, max_tokens: 4096 });
+  return data.choices[0].message.content;
+}
+
+async function aiSendAgent() {
+  const input = document.getElementById('aiInput');
+  const msg = input.value.trim();
+  if (!msg || aiStreaming) return;
+  if (aiCurrentChat < 0) aiNewChat();
+  const chat = aiChats[aiCurrentChat];
+  chat.messages.push({ role: 'user', content: msg });
+  if (chat.messages.length === 1) chat.title = '🤖 ' + msg.slice(0, 37) + (msg.length > 37 ? '…' : '');
+  input.value = ''; input.style.height = 'auto';
+  aiRenderMessages(); aiRenderChatList();
+
+  aiStreaming = true;
+  document.getElementById('aiSendBtn').disabled = true;
+
+  const agentHistory = [{ role: 'user', content: msg }];
+  const toolLog = []; // For "Save as script"
+  let turnCount = 0;
+
+  chat.messages.push({ role: 'assistant', content: '🤖 Agent thinking...' });
+  aiRenderMessages();
+
+  try {
+    while (turnCount < AGENT_MAX_TURNS) {
+      turnCount++;
+      const compacted = agentCompactHistory(agentHistory);
+      const response = await aiAgentCall(compacted);
+
+      // Check if response contains a tool call
+      const toolMatch = response.match(/```tool\s*\n?([\s\S]*?)\n?```/);
+      if (!toolMatch) {
+        // No tool call — agent is done
+        chat.messages[chat.messages.length - 1].content = response;
+        agentHistory.push({ role: 'assistant', content: response });
+        // Add "Save as script" button if tools were called
+        if (toolLog.length) {
+          const scriptJson = agentBuildScript(msg, toolLog);
+          const b64 = btoa(unescape(encodeURIComponent(JSON.stringify(scriptJson))));
+          chat.messages[chat.messages.length - 1].content += '\n\n<div class="ai-script-block" style="margin-top:8px;"><button class="ai-script-add" onclick="aiAddToPresets(this)" data-b64="' + b64 + '">💾 Save as reusable script</button></div>';
+        }
+        aiRenderMessages();
+        break;
+      }
+
+      // Parse and execute tool call
+      let toolCall;
+      try { toolCall = JSON.parse(toolMatch[1]); } catch { chat.messages[chat.messages.length - 1].content = '❌ Agent returned invalid tool JSON:\n' + toolMatch[1]; aiRenderMessages(); break; }
+
+      agentHistory.push({ role: 'assistant', content: response, toolCall });
+      chat.messages[chat.messages.length - 1].content = '🤖 Calling `' + toolCall.tool + '`... (turn ' + turnCount + '/' + AGENT_MAX_TURNS + ')';
+      aiRenderMessages();
+
+      // Execute MCP tool
+      let toolResult;
+      try {
+        const res = await window.api.mcp.callTool(toolCall.tool, toolCall.args || {});
+        if (res && !res.error) {
+          const c = res.content || res.result?.content;
+          toolResult = c ? c.map(x => x.text || JSON.stringify(x)).join('\n') : JSON.stringify(res, null, 2);
+        } else {
+          toolResult = 'ERROR: ' + (res?.error?.message || res?.error || JSON.stringify(res));
+        }
+      } catch (e) {
+        toolResult = 'ERROR: ' + (e.message || 'Tool call failed');
+      }
+
+      toolLog.push({ tool: toolCall.tool, args: toolCall.args, result: toolResult.slice(0, 500) });
+      agentHistory.push({ role: 'tool', toolName: toolCall.tool, content: toolResult.slice(0, 2000) });
+
+      // Update chat with progress
+      const shortResult = toolResult.slice(0, 150) + (toolResult.length > 150 ? '...' : '');
+      chat.messages[chat.messages.length - 1].content = '🤖 `' + toolCall.tool + '` → ' + shortResult + '\n\nThinking...';
+      aiRenderMessages();
+    }
+
+    if (turnCount >= AGENT_MAX_TURNS) {
+      chat.messages[chat.messages.length - 1].content += '\n\n⚠️ Agent reached max turns (' + AGENT_MAX_TURNS + '). Stopping.';
+      aiRenderMessages();
+    }
+  } catch (e) {
+    chat.messages[chat.messages.length - 1].content = '❌ Agent error: ' + e.message;
+    aiRenderMessages();
+  }
+
+  aiStreaming = false;
+  document.getElementById('aiSendBtn').disabled = false;
+  aiRenderChatList();
+}
+
+function agentBuildScript(userPrompt, toolLog) {
+  const steps = [];
+  for (const entry of toolLog) {
+    if (entry.tool.startsWith('_')) continue;
+    steps.push({ tool: entry.tool, args: JSON.stringify(entry.args), label: entry.tool });
+  }
+  steps.push({ tool: '_toast', args: 'Done ✓', toastType: 'success' });
+  return {
+    name: userPrompt.slice(0, 40),
+    description: userPrompt,
+    icon: 'zap',
+    category: 'utility',
+    tags: ['agent', 'auto'],
+    hasUi: false,
+    steps
+  };
 }
 
 function aiShowLearnedPatterns() {
@@ -7935,8 +8628,9 @@ async function proRunPreset() {
     if (step.tool === '_compute') {
       proAppendResult('_compute', 'running', 'Computing...');
       try {
+        const safeResults = new Proxy(proResults, { get(t, p) { return t[p] ?? '{}'; } });
         const fn = new Function('vars', 'results', 'setVar', 'toast', step.args || '');
-        fn(proVars, proResults, (k, v) => { proVars[k] = v; }, showToast);
+        fn(proVars, safeResults, (k, v) => { proVars[k] = v; }, showToast);
         proRemoveLastResult();
         proAppendResult('_compute', true, 'Done. Vars: ' + Object.keys(proVars).join(', '));
       } catch (e) { proRemoveLastResult(); proAppendResult('_compute', false, e.message); break; }
@@ -8111,7 +8805,18 @@ function pubPresetChanged() {
   document.getElementById('pubId').value = (p.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   document.getElementById('pubDesc').value = '';
   document.getElementById('pubHelpGuide').value = p.helpGuide || '';
+  document.getElementById('pubPreviewThumb').style.display = 'none';
+  document.getElementById('pubPreviewFile').value = '';
 }
+
+document.getElementById('pubPreviewFile')?.addEventListener('change', function() {
+  const file = this.files[0];
+  const thumb = document.getElementById('pubPreviewThumb');
+  if (!file) { thumb.style.display = 'none'; return; }
+  const reader = new FileReader();
+  reader.onload = () => { thumb.src = reader.result; thumb.style.display = 'block'; };
+  reader.readAsDataURL(file);
+});
 
 function toKebab(s) { return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
 
@@ -8154,6 +8859,12 @@ async function submitPublish() {
     purchaseUrl: document.getElementById('pubPurchaseUrl').value.trim() || undefined,
     priceLabel: document.getElementById('pubPriceLabel').value.trim() || undefined,
   };
+
+  // Include preview image if selected
+  const previewThumb = document.getElementById('pubPreviewThumb');
+  if (previewThumb.style.display !== 'none' && previewThumb.src) {
+    scriptData.previewImage = previewThumb.src;
+  }
 
   // Obfuscate steps if requested
   if (document.getElementById('pubObfuscate').checked) {

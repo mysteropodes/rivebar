@@ -77,10 +77,16 @@ function decryptScript(encData, licenseKey) {
 function setupAutoUpdater() {
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.forceDevUpdateConfig = true;
   autoUpdater.logger = null;
 
+  let _updateAvailable = false;
   autoUpdater.on('update-available', (info) => {
+    _updateAvailable = true;
     if (mainWindow) mainWindow.webContents.send('updater:status', { type: 'available', version: info.version });
+  });
+  autoUpdater.on('update-not-available', () => {
+    _updateAvailable = false;
   });
   autoUpdater.on('download-progress', (progress) => {
     if (mainWindow) mainWindow.webContents.send('updater:status', { type: 'progress', percent: Math.round(progress.percent) });
@@ -90,7 +96,9 @@ function setupAutoUpdater() {
   });
   autoUpdater.on('error', (err) => {
     console.error('Updater error:', err?.message || err);
-    if (mainWindow) mainWindow.webContents.send('updater:status', { type: 'error', message: err?.message || 'Update failed' });
+    if (_updateAvailable && mainWindow) {
+      mainWindow.webContents.send('updater:status', { type: 'error', message: err?.message || 'Update failed' });
+    }
   });
 
   autoUpdater.checkForUpdates().catch(() => {});
@@ -345,8 +353,9 @@ function createWindow() {
 
   mainWindow.loadFile('index.html');
 
-  mainWindow.on('moved', () => saveBounds());
-  mainWindow.on('resized', () => saveBounds());
+  let _saveBoundsTimer = null;
+  mainWindow.on('moved', () => { clearTimeout(_saveBoundsTimer); _saveBoundsTimer = setTimeout(saveBounds, 500); });
+  mainWindow.on('resized', () => { clearTimeout(_saveBoundsTimer); _saveBoundsTimer = setTimeout(saveBounds, 500); });
 }
 
 function saveBounds() {
@@ -376,12 +385,15 @@ function createFloatingTile(tile, x, y) {
   const display = screen.getPrimaryDisplay();
   const { width: sw } = display.workAreaSize;
   const id = floatingSeq++;
+  const isWidget = tile.display === 'widget' && tile.widgetHtml;
+  const fw = isWidget ? 180 : FLOAT_W;
+  const fh = isWidget ? 140 : FLOAT_H;
   const win = new BrowserWindow({
-    width: FLOAT_W, height: FLOAT_H,
+    width: fw, height: fh,
     x: x != null ? x : Math.round(sw - 70),
     y: y != null ? y : 100 + (floatingGroups.length * 60),
     frame: false, transparent: false, alwaysOnTop: true,
-    resizable: false, minimizable: false, maximizable: false,
+    resizable: isWidget, minimizable: false, maximizable: false,
     skipTaskbar: true, hasShadow: false,
     focusable: true, acceptFirstMouse: true,
     roundedCorners: true,
