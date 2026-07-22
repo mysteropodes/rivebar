@@ -73,17 +73,22 @@ function decryptScript(encData, licenseKey) {
   return JSON.parse(decrypted);
 }
 
-// ── Auto-updater ──
+// ── Auto-updater (manual zip install for unsigned apps) ──
+let _pendingUpdateVersion = null;
+
 function setupAutoUpdater() {
   autoUpdater.autoDownload = true;
-  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.autoInstallOnAppQuit = false;
   autoUpdater.forceDevUpdateConfig = true;
   autoUpdater.disableWebInstaller = false;
-  autoUpdater.logger = null;
+  autoUpdater.logger = { info: console.log, warn: console.warn, error: console.error, debug: console.log };
 
   let _updateAvailable = false;
+  let _downloadedFile = null;
+
   autoUpdater.on('update-available', (info) => {
     _updateAvailable = true;
+    _pendingUpdateVersion = info.version;
     if (mainWindow) mainWindow.webContents.send('updater:status', { type: 'available', version: info.version });
   });
   autoUpdater.on('update-not-available', () => {
@@ -93,17 +98,66 @@ function setupAutoUpdater() {
     if (mainWindow) mainWindow.webContents.send('updater:status', { type: 'progress', percent: Math.round(progress.percent) });
   });
   autoUpdater.on('update-downloaded', (info) => {
+    _downloadedFile = info.downloadedFile;
     if (mainWindow) mainWindow.webContents.send('updater:status', { type: 'ready', version: info.version });
   });
   autoUpdater.on('error', (err) => {
-    console.error('Updater error:', err?.message || err);
-    if (_updateAvailable && mainWindow) {
-      mainWindow.webContents.send('updater:status', { type: 'error', message: err?.message || 'Update failed' });
+    const msg = err?.stack || err?.message || String(err);
+    console.error('Updater Squirrel error (attempting manual install):', msg);
+    if (_updateAvailable && _pendingUpdateVersion) {
+      manualZipInstall(_pendingUpdateVersion).then(() => {
+        if (mainWindow) mainWindow.webContents.send('updater:status', { type: 'ready', version: _pendingUpdateVersion });
+      }).catch((e2) => {
+        console.error('Manual install also failed:', e2);
+        if (mainWindow) mainWindow.webContents.send('updater:status', { type: 'error', message: e2.message || String(e2) });
+      });
     }
   });
 
   autoUpdater.checkForUpdates().catch(() => {});
   setInterval(() => autoUpdater.checkForUpdates().catch(() => {}), 4 * 60 * 60 * 1000);
+}
+
+async function manualZipInstall(version) {
+  const { execFile } = require('child_process');
+  const { promisify } = require('util');
+  const execFileAsync = promisify(execFile);
+
+  const cacheDir = path.join(app.getPath('home'), 'Library', 'Caches', 'rivebar-updater', 'pending');
+  const zipFiles = fs.readdirSync(cacheDir).filter(f => f.endsWith('.zip'));
+  if (!zipFiles.length) throw new Error('No downloaded zip found in cache');
+
+  const zipPath = path.join(cacheDir, zipFiles[0]);
+  const appPath = app.getPath('exe').replace(/\/Contents\/.*$/, '');
+  const appDir = path.dirname(appPath);
+  const tmpDir = path.join(require('os').tmpdir(), `rivebar-update-${Date.now()}`);
+
+  fs.mkdirSync(tmpDir, { recursive: true });
+  await execFileAsync('unzip', ['-o', '-q', zipPath, '-d', tmpDir]);
+
+  const extracted = fs.readdirSync(tmpDir).find(f => f.endsWith('.app'));
+  if (!extracted) throw new Error('No .app found in zip');
+
+  const extractedApp = path.join(tmpDir, extracted);
+  const backupPath = appPath + '.bak';
+
+  // Replace app bundle: backup old, move new, remove backup
+  const script = `
+    set -e
+    rm -rf "${backupPath}"
+    mv "${appPath}" "${backupPath}"
+    mv "${extractedApp}" "${appPath}"
+    xattr -cr "${appPath}"
+    rm -rf "${backupPath}"
+    rm -rf "${tmpDir}"
+    open "${appPath}"
+  `;
+
+  // Write install script and schedule it to run after quit
+  const scriptPath = path.join(require('os').tmpdir(), 'rivebar-install.sh');
+  fs.writeFileSync(scriptPath, `#!/bin/bash\nsleep 2\n${script}`, { mode: 0o755 });
+  require('child_process').spawn('/bin/bash', [scriptPath], { detached: true, stdio: 'ignore' }).unref();
+  app.quit();
 }
 
 // ── Persistence helpers ──
@@ -357,6 +411,8 @@ function createWindow() {
   let _saveBoundsTimer = null;
   mainWindow.on('moved', () => { clearTimeout(_saveBoundsTimer); _saveBoundsTimer = setTimeout(saveBounds, 500); });
   mainWindow.on('resized', () => { clearTimeout(_saveBoundsTimer); _saveBoundsTimer = setTimeout(saveBounds, 500); });
+  mainWindow.on('restore', () => { showAllFloating(); });
+  mainWindow.on('show', () => { showAllFloating(); });
 }
 
 function saveBounds() {
@@ -508,13 +564,53 @@ function trySnapTile(moved) {
 }
 
 
+// Floating state persistence
+let savedFloatingState = []; // [{tile, x, y}]
+
+function saveFloatingState() {
+  savedFloatingState = floatingGroups.map(g => {
+    const b = g.win && !g.win.isDestroyed() ? g.win.getBounds() : null;
+    return { tile: g.tile, x: b ? b.x : null, y: b ? b.y : null };
+  });
+}
+
+function hideAllFloating() {
+  saveFloatingState();
+  for (const g of floatingGroups) {
+    if (g.win && !g.win.isDestroyed()) g.win.hide();
+  }
+}
+
+function showAllFloating() {
+  for (const g of floatingGroups) {
+    if (g.win && !g.win.isDestroyed()) g.win.show();
+  }
+}
+
+function restoreFloatingState() {
+  if (!savedFloatingState.length) return;
+  for (const s of savedFloatingState) {
+    const exists = floatingGroups.some(g => g.tile.scriptFilename === s.tile.scriptFilename);
+    if (!exists) createFloatingTile(s.tile, s.x, s.y);
+  }
+  savedFloatingState = [];
+}
+
 app.whenReady().then(() => {
   ensureDirs(); createWindow(); setupAutoUpdater();
   const cfg = loadConfig();
   applyAutoLaunchSettings(cfg);
 });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
-app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
+app.on('activate', () => {
+  if (BrowserWindow.getAllWindows().filter(w => w !== mainWindow && !floatingGroups.some(g => g.win === w)).length === 0 && (!mainWindow || mainWindow.isDestroyed())) {
+    createWindow();
+    restoreFloatingState();
+  } else if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.show();
+    showAllFloating();
+  }
+});
 
 // ── Local AI detection (Ollama / LM Studio) ──
 function localHttp(method, urlStr, bodyObj, timeoutMs) {
@@ -934,8 +1030,8 @@ ipcMain.handle('window:resize', (_, w, h) => {
   mainWindow.setSize(Math.max(200, Math.min(4000, w|0)), Math.max(200, Math.min(4000, h|0)), false);
 });
 ipcMain.handle('window:getSize', () => mainWindow ? mainWindow.getSize() : [400, 600]);
-ipcMain.handle('window:minimize', () => { if (mainWindow) mainWindow.minimize(); });
-ipcMain.handle('window:close', () => { if (mainWindow) mainWindow.close(); });
+ipcMain.handle('window:minimize', () => { if (mainWindow) { hideAllFloating(); mainWindow.minimize(); } });
+ipcMain.handle('window:close', () => { if (mainWindow) { hideAllFloating(); mainWindow.close(); } });
 ipcMain.handle('window:maximize', () => { if (mainWindow) { mainWindow.isMaximized() ? mainWindow.unmaximize() : mainWindow.maximize(); } });
 
 // Custom icon
@@ -1016,8 +1112,12 @@ ipcMain.handle('updater:check', () => {
   autoUpdater.checkForUpdates().catch(() => {});
   return true;
 });
-ipcMain.handle('updater:install', () => {
-  autoUpdater.quitAndInstall(false, true);
+ipcMain.handle('updater:install', async () => {
+  if (_pendingUpdateVersion) {
+    try { await manualZipInstall(_pendingUpdateVersion); } catch(e) { console.error('Manual install failed:', e); }
+  } else {
+    autoUpdater.quitAndInstall(false, true);
+  }
 });
 
 // Presets (Pro feature — step editor)
@@ -1302,7 +1402,7 @@ ipcMain.handle('store:publish', async (_, scriptData) => {
 
     const scriptId = scriptData.id;
 
-    const scriptFile = { id: scriptId, name: scriptData.title, description: scriptData.description, author: scriptData.author, version: scriptData.version || '1.0.0', steps: scriptData.steps || [] };
+    const scriptFile = { id: scriptId, name: scriptData.title, description: scriptData.description, author: scriptData.author, version: scriptData.version || '1.0.0', steps: scriptData.steps || [], ...(scriptData.helpGuide ? { helpGuide: scriptData.helpGuide } : {}), ...(scriptData.previewImage ? { previewImage: scriptData.previewImage } : {}), ...(scriptData.widget ? { widget: scriptData.widget } : {}), ...(scriptData.display ? { display: scriptData.display } : {}) };
 
     // Get current catalog
     const catRes = await githubRequest('GET', `/repos/${STORE_REPO_OWNER}/${STORE_REPO_NAME}/contents/catalog.json`, null, token);
@@ -1330,6 +1430,10 @@ ipcMain.handle('store:publish', async (_, scriptData) => {
     };
     if (scriptData.purchaseUrl) catalogEntry.purchaseUrl = scriptData.purchaseUrl;
     if (scriptData.priceLabel) catalogEntry.priceLabel = scriptData.priceLabel;
+    if (scriptData.previewImage) catalogEntry.previewImage = scriptData.previewImage;
+    if (scriptData.helpGuide) catalogEntry.helpGuide = scriptData.helpGuide;
+    if (scriptData.widget) catalogEntry.widget = scriptData.widget;
+    if (scriptData.display) catalogEntry.display = scriptData.display;
 
     // Check if script already exists
     const existing = catalog.findIndex(s => s.id === scriptId);

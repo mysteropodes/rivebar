@@ -1,0 +1,10 @@
+node_modules/
+dist/
+dist-obf/
+.DS_Store
+
+# Personal script library / presets / media (not app source)
+script/
+presets/
+media/
+motion-path-editor.json

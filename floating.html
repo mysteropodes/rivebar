@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: #12121a; overflow: hidden; user-select: none; font-family: -apple-system, sans-serif; width: 100%; height: 100%; }
+  .wrap { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 3px; background: rgba(18,18,26,0.95); border: 1px solid rgba(255,255,255,0.08); border-radius: 11px; }
+  .grip { width: 26px; height: 10px; border-radius: 5px; background: rgba(255,255,255,0.12); display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.45); font-size: 8px; -webkit-app-region: drag; cursor: grab; flex: none; }
+  .grip:active { cursor: grabbing; }
+  .fb { width: 26px; height: 26px; border-radius: 7px; display: flex; align-items: center; justify-content: center; color: white; font-size: 11px; font-weight: 700; cursor: pointer; -webkit-app-region: no-drag; transition: transform 0.1s, filter 0.1s; text-shadow: 0 1px 2px rgba(0,0,0,0.3); box-shadow: 0 2px 6px rgba(0,0,0,0.3); flex: none; }
+  .fb:hover { transform: scale(1.12); filter: brightness(1.15); }
+  .fb:active { transform: scale(0.92); }
+  .close-btn { width: 26px; height: 12px; border-radius: 6px; background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.5); font-size: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; -webkit-app-region: no-drag; flex: none; }
+  .close-btn:hover { background: rgba(95,51,255,0.6); color: white; }
+  .err { color: #ff6b6b; font-size: 7px; text-align: center; padding: 2px; }
+</style>
+</head>
+<body>
+<div class="wrap" id="wrap"></div>
+<script>
+  const COLORS = { design:'#2dd4a0', animation:'#e5a63b', rigging:'#e55c8a', utility:'#a97cf8', layout:'#5b9bf5' };
+  let groupId = null;
+
+  function render(data) {
+    groupId = data.groupId;
+    const wrap = document.getElementById('wrap');
+    wrap.innerHTML = '';
+
+    const grip = document.createElement('div');
+    grip.className = 'grip'; grip.title = 'Drag to move • drop on another to merge'; grip.textContent = '⠿';
+    wrap.appendChild(grip);
+
+    for (const t of data.tiles) {
+      if (t.display === 'widget' && t.widgetHtml) {
+        wrap.style.padding = '3px';
+        const wdiv = document.createElement('div');
+        wdiv.style.cssText = 'flex:1;width:100%;overflow:hidden;border-radius:8px;position:relative;';
+        wdiv.innerHTML = t.widgetHtml;
+        const scr = wdiv.querySelectorAll('script');
+        scr.forEach(s => { const ns = document.createElement('script'); ns.textContent = s.textContent; s.replaceWith(ns); });
+        wrap.appendChild(wdiv);
+      } else {
+        const b = document.createElement('div');
+        b.className = 'fb';
+        b.style.background = t.color || COLORS[t.category] || '#5f33ff';
+        b.title = t.name || '';
+        b.textContent = t.icon === 'bone' ? '🦴' : (t.name ? t.name.charAt(0).toUpperCase() : '▶');
+        b.addEventListener('click', () => {
+          b.style.transform = 'scale(0.8)';
+          setTimeout(() => b.style.transform = '', 180);
+          window.api.floating.run(t.scriptFilename).catch(() => {});
+        });
+        wrap.appendChild(b);
+      }
+    }
+
+    const close = document.createElement('div');
+    close.className = 'close-btn'; close.title = 'Reattach to panel'; close.textContent = '⤺';
+    close.addEventListener('click', () => { try { window.api.floating.closeGroup(groupId); } catch (e) {} });
+    wrap.appendChild(close);
+  }
+
+  if (window.api && window.api.floating && window.api.floating.onInit) {
+    window.api.floating.onInit(render);
+  } else {
+    document.getElementById('wrap').innerHTML = '<div class="err">no api</div>';
+  }
+</script>
+</body>
+</html>
