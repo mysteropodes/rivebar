@@ -1,0 +1,49 @@
+{
+  "title": "Auto Anticipation & Bounce (Final Fix)",
+  "description": "Robust parsing and calculation without results access in UI step.",
+  "icon": "feather",
+  "category": "animation",
+  "tags": ["keyframe", "anticipation", "bounce"],
+  "hasUi": true,
+  "steps": [
+    {
+      "tool": "animation_editor",
+      "args": "{ \"command\": \"queryKeyFrames\", \"selectedKeyFramesOnly\": true }",
+      "label": "1. Query Keys"
+    },
+    {
+      "tool": "_compute",
+      "args": "var raw = results[0]; if(!raw) throw new Error('No response'); var data = JSON.parse(raw); var kf = data.keyframes; if(!kf) throw new Error('No keyframes'); var animId = ''; var keys = []; for(var id in kf){ animId=id; keys=keys.concat(kf[id]); } if(!animId) throw new Error('No anim ID'); setVar('animId', animId); setVar('keys', keys);",
+      "label": "2. Parse Data"
+    },
+    {
+      "tool": "_ui",
+      "ui": {
+        "title": "Settings",
+        "fields": [
+          { "key": "antF", "label": "Anticipation (fr)", "type": "number", "default": 5 },
+          { "key": "antS", "label": "Anticipation Strength", "type": "number", "default": 0.3 },
+          { "key": "bounF", "label": "Bounce (fr)", "type": "number", "default": 5 },
+          { "key": "bounS", "label": "Bounce Strength", "type": "number", "default": 0.15 },
+          { "key": "interp", "label": "Type", "type": "select", "options": ["linear", "cubic", "hold"], "default": "cubic" }
+        ]
+      },
+      "label": "3. UI Config"
+    },
+    {
+      "tool": "_compute",
+      "args": "var keys = vars.keys; var animId = vars.animId; var antF = parseFloat(vars.antF)||5; var antS = parseFloat(vars.antS)||0.3; var bounF = parseFloat(vars.bounF)||5; var bounS = parseFloat(vars.bounS)||0.15; var interp = vars.interp||'cubic'; var groups = {}; keys.forEach(function(k){ var gid = k.objectId+'_'+k.propertyKey; if(!groups[gid]) groups[gid]=[]; groups[gid].push(k); }); var newKeys = []; for(var gid in groups){ var g = groups[gid]; g.sort(function(a,b){return a.frame-b.frame;}); if(g.length<2) continue; var s=g[0]; var e=g[g.length-1]; var delta = e.value - s.value; newKeys.push({objectId:s.objectId, propertyKey:s.propertyKey, frame:Math.round(s.frame-antF), value:s.value-(delta*antS), interpolationType:interp}); newKeys.push({objectId:s.objectId, propertyKey:s.propertyKey, frame:Math.round(e.frame+bounF), value:e.value+(delta*bounS), interpolationType:interp}); newKeys.push({objectId:s.objectId, propertyKey:s.propertyKey, frame:Math.round(e.frame+bounF*2), value:e.value, interpolationType:interp}); } if(newKeys.length===0) throw new Error('Need 2+ keys per property'); setVar('newKeys', newKeys); setVar('animId', animId);",
+      "label": "4. Calculate (No Results Access)"
+    },
+    {
+      "tool": "animation_editor",
+      "args": "{ \"command\": \"modifyKeyFrames\", \"animationId\": \"{{animId}}\", \"add\": {{json:newKeys}} }",
+      "label": "5. Apply"
+    },
+    {
+      "tool": "_compute",
+      "args": "throw new Error('DONE! Added '+vars.newKeys.length+' keys.');",
+      "label": "6. End"
+    }
+  ]
+}

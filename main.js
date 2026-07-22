@@ -161,8 +161,24 @@ async function manualZipInstall(version) {
 }
 
 // ── Persistence helpers ──
+const BUNDLED_SCRIPTS_DIR = path.join(__dirname, 'bundled-scripts');
+
 function ensureDirs() {
   if (!fs.existsSync(SCRIPTS_DIR)) fs.mkdirSync(SCRIPTS_DIR, { recursive: true });
+}
+
+// Copies scripts shipped with the app into the user's script library.
+// Only adds files that aren't already present (by filename) — never
+// overwrites a script the user has edited or removed.
+function seedBundledScripts() {
+  if (!fs.existsSync(BUNDLED_SCRIPTS_DIR)) return;
+  ensureDirs();
+  for (const f of fs.readdirSync(BUNDLED_SCRIPTS_DIR)) {
+    if (!f.endsWith('.json')) continue;
+    const dest = path.join(SCRIPTS_DIR, f);
+    if (fs.existsSync(dest)) continue;
+    try { fs.copyFileSync(path.join(BUNDLED_SCRIPTS_DIR, f), dest); } catch {}
+  }
 }
 
 function loadConfig() {
@@ -597,7 +613,7 @@ function restoreFloatingState() {
 }
 
 app.whenReady().then(() => {
-  ensureDirs(); createWindow(); setupAutoUpdater();
+  ensureDirs(); seedBundledScripts(); createWindow(); setupAutoUpdater();
   const cfg = loadConfig();
   applyAutoLaunchSettings(cfg);
 });

@@ -1,0 +1,53 @@
+{
+  "title": "Rig Bone Renamer",
+  "description": "Rename entire bone hierarchy from root selection using anatomical conventions",
+  "icon": "bone",
+  "category": "rigging",
+  "tags": ["rig", "bones", "rename", "skeleton", "hierarchy"],
+  "hasUi": true,
+  "steps": [
+    {
+      "tool": "get_selection",
+      "args": "{}",
+      "label": "Get selected root bone"
+    },
+    {
+      "tool": "_compute",
+      "args": "var raw = results[0]; var data = JSON.parse(raw); var items = data.selection || (Array.isArray(data) ? data : []); var root = items[0]; if (!root || !root.id) throw new Error('Please select an object as root bone.'); setVar('rootId', root.id); setVar('rootName', root.name); setVar('artboardId', root.artboardId || '');",
+      "label": "Validate root selection"
+    },
+    {
+      "tool": "_ui",
+      "ui": {
+        "title": "Rig Configuration",
+        "fields": [
+          { "key": "side", "label": "Side", "type": "select", "options": ["Left", "Right"], "default": "Right" },
+          { "key": "bodyPart", "label": "Body Part", "type": "select", "options": ["Arm", "Leg", "Spine", "Finger", "Toe", "Neck", "Head"], "default": "Arm" },
+          { "key": "prefix", "label": "Custom Prefix (optional)", "type": "text", "default": "" },
+          { "key": "suffix", "label": "Suffix (e.g., _R, _L)", "type": "text", "default": "_R" }
+        ]
+      },
+      "label": "Configure rig naming"
+    },
+    {
+      "tool": "_compute",
+      "args": "var side = vars.side; var part = vars.bodyPart; var prefix = vars.prefix || ''; var suffix = vars.suffix || ''; var suffixAuto = suffix; if (!suffixAuto) { suffixAuto = (side === 'Left') ? '_L' : '_R'; } var sequences = { 'Arm': ['Shoulder', 'Elbow', 'Wrist', 'Hand', 'Finger1', 'Finger2', 'Finger3'], 'Leg': ['Hip', 'Knee', 'Ankle', 'Foot', 'Toe1', 'Toe2'], 'Spine': ['Hip', 'Spine1', 'Spine2', 'Spine3', 'Chest', 'Neck'], 'Finger': ['Knuckle', 'Intermediate', 'Tip'], 'Toe': ['Knuckle', 'Intermediate', 'Tip'], 'Neck': ['Neck1', 'Neck2', 'Head'], 'Head': ['Head', 'Eye_L', 'Eye_R', 'Jaw'] }; var names = sequences[part] || ['Bone']; setVar('boneNames', names); setVar('sidePrefix', prefix ? prefix : (side === 'Left' ? 'L_' : 'R_')); setVar('sideSuffix', suffixAuto); setVar('partName', part);",
+      "label": "Build naming sequence"
+    },
+    {
+      "tool": "get_artboard_hierarchy",
+      "args": "{ \"artboard_id\": \"{{artboardId}}\" }",
+      "label": "Get full hierarchy"
+    },
+    {
+      "tool": "_compute",
+      "args": "var raw = results[4]; var data = JSON.parse(raw); var objects = data.objects || (Array.isArray(data) ? data : []); if (!objects.length) throw new Error('No objects found in artboard.'); var rootId = vars.rootId; var names = vars.boneNames; var sidePre = vars.sidePrefix; var sideSuf = vars.sideSuffix; var part = vars.partName; var nodeMap = {}; objects.forEach(function(o) { nodeMap[o.id] = o; o._childrenNodes = []; }); var rootNode = null; objects.forEach(function(o) { if (o.children && Array.isArray(o.children)) { o.children.forEach(function(childId) { var child = nodeMap[childId]; if (child) { child._parentId = o.id; o._childrenNodes.push(child); } }); } if (o.id === rootId) { rootNode = o; } }); if (!rootNode) throw new Error('Root object not found in hierarchy.'); var renames = []; var idx = 0; function isBone(n) { if (!n.types) return false; return n.types.some(function(t) { var s = (t || '').toLowerCase(); return s === 'bone' || s === 'rootbone'; }); } function walk(n) { if (isBone(n)) { var baseName = (idx < names.length) ? names[idx] : ('Bone_' + (idx + 1)); var finalName = sidePre + part + '_' + baseName + sideSuf; renames.push({ id: n.id, name: finalName }); idx++; } if (n._childrenNodes) { n._childrenNodes.forEach(function(c) { walk(c); }); } } walk(rootNode); if (renames.length === 0) throw new Error('No bones found in hierarchy.'); setVar('renames', renames); setVar('count', String(renames.length));",
+      "label": "Traverse hierarchy and build rename list"
+    },
+    {
+      "tool": "rename_objects",
+      "args": "{ \"renames\": {{json:renames}} }",
+      "label": "Apply renaming ({{count}} bones)"
+    }
+  ]
+}

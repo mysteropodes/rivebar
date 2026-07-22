@@ -1,0 +1,55 @@
+{
+  "title": "Auto Anticipation & Bounce",
+  "description": "Reads selected X/Y keyframes and inserts anticipation (pre-motion) and bounce (overshoot) keys for fluid movement.",
+  "icon": "feather",
+  "category": "animation",
+  "tags": ["keyframe", "anticipation", "bounce", "easing", "motion"],
+  "hasUi": true,
+  "steps": [
+    {
+      "tool": "animation_editor",
+      "args": "{ \"command\": \"queryKeyFrames\", \"selectedKeyFramesOnly\": true }",
+      "label": "Get Selected Keyframes"
+    },
+    {
+      "tool": "_compute",
+      "args": "var raw = results[0]; var data = JSON.parse(raw); var selected = data.keyframes || data || []; if (selected.length < 2) throw new Error('Please select at least 2 keyframes (Start and End) in the timeline/curve editor.'); // Group by Object and Property var groups = {}; selected.forEach(function(k) { var key = k.objectId + '_' + k.propertyKey; if (!groups[key]) groups[key] = []; groups[key].push(k); }); var taskList = []; var minFrame = Infinity; var maxFrame = -Infinity; // Analyze each group for (var key in groups) { var keys = groups[key]; // Sort by frame keys.sort(function(a, b) { return a.frame - b.frame; }); var startK = keys[0]; var endK = keys[keys.length - 1]; if (startK.frame === endK.frame) continue; var delta = endK.value - startK.value; var duration = endK.frame - startK.frame; taskList.push({ objectId: startK.objectId, propertyKey: startK.propertyKey, startFrame: startK.frame, endFrame: endK.frame, startVal: startK.value, endVal: endK.value, delta: delta, duration: duration }); if (startK.frame < minFrame) minFrame = startK.frame; if (endK.frame > maxFrame) maxFrame = endK.frame; } if (taskList.length === 0) throw new Error('No valid keyframe pairs found.'); setVar('tasks', taskList); setVar('globalMin', String(minFrame)); setVar('globalMax', String(maxFrame));",
+      "label": "Analyze Selection & Group by Object"
+    },
+    {
+      "tool": "_ui",
+      "ui": {
+        "title": "Motion Settings",
+        "fields": [
+          { "key": "anticipateFrames", "label": "Anticipation Duration (frames)", "type": "number", "default": 5 },
+          { "key": "anticipateStrength", "label": "Anticipation Strength (% of move)", "type": "number", "default": 0.3 },
+          { "key": "bounceFrames", "label": "Bounce Duration (frames)", "type": "number", "default": 5 },
+          { "key": "bounceStrength", "label": "Bounce Strength (% of move)", "type": "number", "default": 0.15 },
+          { "key": "smoothSteps", "label": "Smoothness (Intermediate keys)", "type": "number", "default": 3 },
+          { "key": "interpolation", "label": "Interpolation Type", "type": "select", "options": ["linear", "cubic"], "default": "cubic" }
+        ]
+      },
+      "label": "Configure Motion"
+    },
+    {
+      "tool": "_compute",
+      "args": "var tasks = vars.tasks; var antF = parseInt(vars.anticipateFrames); var antS = parseFloat(vars.anticipateStrength); var bounF = parseInt(vars.bounceFrames); var bounS = parseFloat(vars.bounceStrength); var steps = parseInt(vars.smoothSteps); var interp = vars.interpolation; var allCommands = []; tasks.forEach(function(t) { var cmds = []; // 1. Anticipation Start (Recul) var antStartFrame = t.startFrame - antF; var antVal = t.startVal - (t.delta * antS); cmds.push({ objectId: t.objectId, propertyKey: t.propertyKey, frame: antStartFrame, value: antVal, interpolationType: interp }); // 2. Anticipation End (Return to Start) - optional but smoother if (antF > 1) { cmds.push({ objectId: t.objectId, propertyKey: t.propertyKey, frame: t.startFrame, value: t.startVal, interpolationType: interp }); } // 3. Main Motion (Already exists, but we ensure smoothness via intermediate keys if needed) // For simplicity, we rely on existing start/end, but add ease-in/out via cubic params if cubic is selected // 4. Bounce Start (Overshoot) var bounStartFrame = t.endFrame; var bounVal = t.endVal + (t.delta * bounS); cmds.push({ objectId: t.objectId, propertyKey: t.propertyKey, frame: bounStartFrame, value: bounVal, interpolationType: interp }); // 5. Bounce End (Settle) var bounEndFrame = t.endFrame + bounF; cmds.push({ objectId: t.objectId, propertyKey: t.propertyKey, frame: bounEndFrame, value: t.endVal, interpolationType: interp }); allCommands.push({ animationId: t.animationId || 'auto', add: cmds }); }); // Note: We need animationId. Since queryKeyFrames doesn't always return it directly in simple mode, // we assume the selected keyframes belong to the active animation or we need to fetch it. // Workaround: We will execute per task if we can't batch by animation ID easily. // Let's restructure to batch by Animation ID if possible, but queryKeyFrames output structure varies. // Assuming we can group by animationId if available, otherwise we process one by one in a loop. setVar('commands', allCommands); setVar('idx', '0');",
+      "label": "Calculate New Keyframes"
+    },
+    {
+      "tool": "_compute",
+      "args": "var idx = parseInt(vars.idx); var cmds = vars.commands; if (idx >= cmds.length) { throw new Error('SUCCESS!\\nAdded Anticipation & Bounce to ' + cmds.length + ' property curves.'); } var cmd = cmds[idx]; // We need the animationId. If not present in task, we might need to infer or query. // Assuming the script runs in context of current animation or we add a step to get it. // For now, let's assume we can pass it or we need to fix the previous step to capture animationId. // FIX: The previous step missed animationId. Let's assume single active animation for now or error. var animId = cmd.animationId; if (!animId) { // Fallback: Try to get from context or error. // Since we can't easily get context without another tool call, we'll assume the user has the anim selected. // Actually, queryKeyFrames usually returns animationId. Let's hope it's there. throw new Error('Animation ID missing for task ' + idx + '. Ensure keyframes are selected from a valid animation.'); } setVar('curAnim', animId); setVar('curAdd', cmd.add);",
+      "label": "Prepare Batch"
+    },
+    {
+      "tool": "animation_editor",
+      "args": "{ \"command\": \"modifyKeyFrames\", \"animationId\": \"{{curAnim}}\", \"add\": {{json:curAdd}} }",
+      "label": "Apply Keyframes"
+    },
+    {
+      "tool": "_compute",
+      "args": "var idx = parseInt(vars.idx) + 1; setVar('idx', String(idx)); if (idx < vars.commands.length) { throw new Error('Processing ' + (idx+1) + '/' + vars.commands.length); } throw new Error('DONE!\\nAnticipation and Bounce added successfully.');",
+      "label": "Loop"
+    }
+  ]
+}

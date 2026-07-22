@@ -1,0 +1,60 @@
+{
+  "title": "Bind Size to ViewModel",
+  "description": "Crée sizeW/sizeH dans le ViewModel et bind la taille du layer sélectionné",
+  "icon": "layers",
+  "category": "rigging",
+  "tags": ["viewmodel", "bind", "size", "transform"],
+  "hasUi": false,
+  "steps": [
+    {
+      "tool": "get_selection",
+      "args": "{}",
+      "label": "Récupérer la sélection"
+    },
+    {
+      "tool": "_compute",
+      "args": "const sel = JSON.parse(results[0]); const items = sel.content ? JSON.parse(sel.content[0].text) : sel; const obj = Array.isArray(items) ? items[0] : items; if (!obj || !obj.id) throw new Error('Sélectionnez un objet d'abord'); setVar('objectId', obj.id); setVar('objectName', obj.name || 'Objet'); setVar('artboardId', obj.artboardId || '');",
+      "label": "Extraire l'objet sélectionné"
+    },
+    {
+      "tool": "query_property_keys",
+      "args": "{ \"object_id\": \"{{objectId}}\" }",
+      "label": "Trouver les clés de propriété pour la taille"
+    },
+    {
+      "tool": "_compute",
+      "args": "const keys = JSON.parse(results[2]); const keyList = Array.isArray(keys) ? keys : (keys.keys || []); let scaleX = null, scaleY = null; keyList.forEach(k => { const name = (k.name || '').toLowerCase(); if (name.includes('scale x') || name.includes('width')) scaleX = k.id; if (name.includes('scale y') || name.includes('height')) scaleY = k.id; }); if (scaleX === null || scaleY === null) throw new Error('Propriétés de taille non trouvées'); setVar('scaleXKey', String(scaleX)); setVar('scaleYKey', String(scaleY));",
+      "label": "Identifier les clés Scale X/Y"
+    },
+    {
+      "tool": "viewmodel_editor",
+      "args": "{ \"command\": \"createNumberProperty\", \"data\": { \"createNumberProperty\": { \"name\": \"sizeW\", \"value\": 100 } } }",
+      "label": "Créer propriété sizeW"
+    },
+    {
+      "tool": "viewmodel_editor",
+      "args": "{ \"command\": \"createNumberProperty\", \"data\": { \"createNumberProperty\": { \"name\": \"sizeH\", \"value\": 100 } } }",
+      "label": "Créer propriété sizeH"
+    },
+    {
+      "tool": "viewmodel_editor",
+      "args": "{ \"command\": \"listProperties\" }",
+      "label": "Lister les propriétés du ViewModel"
+    },
+    {
+      "tool": "_compute",
+      "args": "const props = JSON.parse(results[6]); const propList = Array.isArray(props) ? props : (props.properties || []); let sizeWId = null, sizeHId = null; propList.forEach(p => { if (p.name === 'sizeW') sizeWId = p.id; if (p.name === 'sizeH') sizeHId = p.id; }); if (!sizeWId || !sizeHId) throw new Error('Propriétés ViewModel non trouvées'); setVar('sizeWId', sizeWId); setVar('sizeHId', sizeHId);",
+      "label": "Récupérer les IDs des propriétés"
+    },
+    {
+      "tool": "viewmodel_editor",
+      "args": "{ \"command\": \"bindProperty\", \"data\": { \"bindProperty\": { \"objectId\": \"{{objectId}}\", \"propertyKey\": {{scaleXKey}}, \"viewModelPropertyId\": \"{{sizeWId}}\" } } }",
+      "label": "Binder Scale X à sizeW"
+    },
+    {
+      "tool": "viewmodel_editor",
+      "args": "{ \"command\": \"bindProperty\", \"data\": { \"bindProperty\": { \"objectId\": \"{{objectId}}\", \"propertyKey\": {{scaleYKey}}, \"viewModelPropertyId\": \"{{sizeHId}}\" } } }",
+      "label": "Binder Scale Y à sizeH"
+    }
+  ]
+}

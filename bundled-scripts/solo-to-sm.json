@@ -1,0 +1,147 @@
+{
+  "title": "Solo to State Machine",
+  "description": "Creates a timeline per Solo child, builds a SM layer with Any State transitions and ViewModel number conditions",
+  "icon": "layers",
+  "category": "animation",
+  "tags": ["solo", "state machine", "timeline", "viewmodel", "automation"],
+  "hasUi": true,
+  "steps": [
+    {
+      "tool": "get_selection",
+      "args": "{}",
+      "label": "Get selection"
+    },
+    {
+      "tool": "_compute",
+      "args": "var d = JSON.parse(results[0]); var s = d.selection || []; if (s.length === 0) throw new Error('Select a Solo first'); setVar('soloId', s[0].id); setVar('soloName', s[0].name || 'Solo');",
+      "label": "Validate Solo"
+    },
+    {
+      "tool": "get_artboard_hierarchy",
+      "args": "{ \"depth\": 5 }",
+      "label": "Get hierarchy"
+    },
+    {
+      "tool": "_compute",
+      "args": "var h = JSON.parse(results[2]); var objs = h.objects || []; var solo = null; for (var i = 0; i < objs.length; i++) { if (objs[i].id === vars.soloId) { solo = objs[i]; break; } } if (!solo) throw new Error('Solo not found'); var childIds = solo.children || []; if (childIds.length < 2) throw new Error('Solo needs 2+ children'); var children = []; for (var c = 0; c < childIds.length; c++) { for (var j = 0; j < objs.length; j++) { if (objs[j].id === childIds[c]) { children.push(objs[j]); break; } } } if (children.length > 8) throw new Error('Max 8 children supported, found ' + children.length); setVar('children', children); setVar('childCount', String(children.length));",
+      "label": "Find Solo children"
+    },
+    {
+      "tool": "_ui",
+      "ui": {
+        "title": "Solo → State Machine ({{childCount}} children)",
+        "fields": [
+          { "key": "prefix", "label": "Timeline prefix", "type": "text", "default": "{{soloName}}" },
+          { "key": "vmPropName", "label": "ViewModel number property name", "type": "text", "default": "soloIndex" }
+        ]
+      },
+      "label": "Configure"
+    },
+    {
+      "tool": "animation_editor",
+      "args": "{ \"command\": \"listStateMachines\" }",
+      "label": "List state machines"
+    },
+    {
+      "tool": "viewmodel_editor",
+      "args": "{ \"command\": \"listViewModels\" }",
+      "label": "List ViewModels"
+    },
+    {
+      "tool": "_compute",
+      "args": "var sm = JSON.parse(results[5]); var sms = sm.stateMachines || []; if (sms.length === 0) throw new Error('No state machine found'); setVar('smId', sms[0].id); var vm = JSON.parse(results[6]); var vms = vm.viewModels || []; if (vms.length === 0) throw new Error('No ViewModel found'); setVar('vmId', vms[0].id); var vmProps = vms[0].viewModelProperties || []; var propName = vars.vmPropName || 'soloIndex'; var existing = null; for (var p = 0; p < vmProps.length; p++) { if (vmProps[p].name === propName) { existing = vmProps[p]; break; } } setVar('vmPropExists', !!existing); if (existing) setVar('vmPropId', existing.id); var ch = vars.children; var prefix = vars.prefix || 'Solo'; var anims = []; for (var i = 0; i < ch.length; i++) anims.push({ name: prefix + '_' + ch[i].name, duration: 1 }); setVar('animList', anims);",
+      "label": "Prepare data"
+    },
+    {
+      "tool": "animation_editor",
+      "args": "{ \"command\": \"createLinearAnimations\", \"data\": { \"createLinearAnimations\": { \"linearAnimations\": {{json:animList}} } } }",
+      "label": "Create timelines"
+    },
+    {
+      "tool": "animation_editor",
+      "args": "{ \"command\": \"listLinearAnimations\" }",
+      "label": "List animations"
+    },
+    {
+      "tool": "_compute",
+      "args": "var raw = JSON.parse(results[9]); var all = raw.linearAnimations || []; var ch = vars.children; var al = vars.animList; var soloId = vars.soloId; var map = []; for (var i = 0; i < al.length; i++) { for (var j = 0; j < all.length; j++) { if (all[j].name === al[i].name) { map.push({ id: all[j].id, idx: i, name: al[i].name, childId: ch[i].id }); break; } } } if (map.length === 0) throw new Error('Created animations not found'); for (var i = 0; i < 8; i++) { if (i < map.length) { setVar('kfA' + i, map[i].id); setVar('kfD' + i, [{ objectId: soloId, propertyKey: 296, frame: 0, value: map[i].childId, interpolationType: 'hold' }]); } else { setVar('kfA' + i, map[0].id); setVar('kfD' + i, []); } } var cols = 4; var spacingX = 160; var spacingY = 120; var startX = 160; var startY = -150; var states = []; var trans = []; for (var i = 0; i < map.length; i++) { var col = i % cols; var row = Math.floor(i / cols); states.push({ name: map[i].name, linearAnimationName: map[i].name, x: startX + col * spacingX, y: startY + row * spacingY }); trans.push({ from: '{Any State}', to: map[i].name }); } setVar('smLayers', [{ name: vars.prefix + '_States', states: states, otherTransitions: trans }]); setVar('animMap', map);",
+      "label": "Map animations + prepare keyframes"
+    },
+    {
+      "tool": "animation_editor",
+      "args": "{ \"command\": \"modifyKeyFrames\", \"data\": { \"modifyKeyFrames\": { \"animationId\": \"{{kfA0}}\", \"add\": {{json:kfD0}} } } }",
+      "label": "Keyframe child 1"
+    },
+    {
+      "tool": "animation_editor",
+      "args": "{ \"command\": \"modifyKeyFrames\", \"data\": { \"modifyKeyFrames\": { \"animationId\": \"{{kfA1}}\", \"add\": {{json:kfD1}} } } }",
+      "label": "Keyframe child 2"
+    },
+    {
+      "tool": "animation_editor",
+      "args": "{ \"command\": \"modifyKeyFrames\", \"data\": { \"modifyKeyFrames\": { \"animationId\": \"{{kfA2}}\", \"add\": {{json:kfD2}} } } }",
+      "label": "Keyframe child 3"
+    },
+    {
+      "tool": "animation_editor",
+      "args": "{ \"command\": \"modifyKeyFrames\", \"data\": { \"modifyKeyFrames\": { \"animationId\": \"{{kfA3}}\", \"add\": {{json:kfD3}} } } }",
+      "label": "Keyframe child 4"
+    },
+    {
+      "tool": "animation_editor",
+      "args": "{ \"command\": \"modifyKeyFrames\", \"data\": { \"modifyKeyFrames\": { \"animationId\": \"{{kfA4}}\", \"add\": {{json:kfD4}} } } }",
+      "label": "Keyframe child 5"
+    },
+    {
+      "tool": "animation_editor",
+      "args": "{ \"command\": \"modifyKeyFrames\", \"data\": { \"modifyKeyFrames\": { \"animationId\": \"{{kfA5}}\", \"add\": {{json:kfD5}} } } }",
+      "label": "Keyframe child 6"
+    },
+    {
+      "tool": "animation_editor",
+      "args": "{ \"command\": \"modifyKeyFrames\", \"data\": { \"modifyKeyFrames\": { \"animationId\": \"{{kfA6}}\", \"add\": {{json:kfD6}} } } }",
+      "label": "Keyframe child 7"
+    },
+    {
+      "tool": "animation_editor",
+      "args": "{ \"command\": \"modifyKeyFrames\", \"data\": { \"modifyKeyFrames\": { \"animationId\": \"{{kfA7}}\", \"add\": {{json:kfD7}} } } }",
+      "label": "Keyframe child 8"
+    },
+    {
+      "tool": "animation_editor",
+      "args": "{ \"command\": \"createStateMachineLayers\", \"data\": { \"createStateMachineLayers\": { \"stateMachineId\": \"{{smId}}\", \"layers\": {{json:smLayers}} } } }",
+      "label": "Create SM layer"
+    },
+    {
+      "tool": "viewmodel_editor",
+      "args": "{ \"command\": \"addProperties\", \"data\": { \"addProperties\": { \"viewModels\": [{ \"viewModelId\": \"{{vmId}}\", \"viewModelProperties\": [{ \"name\": \"{{vmPropName}}\", \"propertyType\": \"number\" }] }] } } }",
+      "label": "Add VM number property"
+    },
+    {
+      "tool": "viewmodel_editor",
+      "args": "{ \"command\": \"listViewModels\" }",
+      "label": "Refresh ViewModels"
+    },
+    {
+      "tool": "animation_editor",
+      "args": "{ \"command\": \"queryStateMachine\" }",
+      "label": "Query state machine"
+    },
+    {
+      "tool": "_compute",
+      "args": "var vmRaw = JSON.parse(results[21]); var vms = vmRaw.viewModels || []; var vm = null; for (var i = 0; i < vms.length; i++) { if (vms[i].id === vars.vmId) { vm = vms[i]; break; } } var props = vm ? (vm.viewModelProperties || []) : []; var propName = vars.vmPropName || 'soloIndex'; var prop = null; for (var i = 0; i < props.length; i++) { if (props[i].name === propName) { prop = props[i]; break; } } if (!prop) throw new Error('VM property \"' + propName + '\" not found. Add it manually then re-run.'); var smRaw = JSON.parse(results[22]); var layers = smRaw.layers || []; var myLayer = null; var layerName = vars.prefix + '_States'; for (var i = 0; i < layers.length; i++) { if (layers[i].layerName === layerName) { myLayer = layers[i]; break; } } if (!myLayer) throw new Error('SM layer \"' + layerName + '\" not found'); var anyStateId = myLayer.anyStateId; if (!anyStateId) throw new Error('Any State ID not found'); var transitions = myLayer.transitions || []; var anyTrans = []; for (var i = 0; i < transitions.length; i++) { if (transitions[i].fromStateId === anyStateId) anyTrans.push(transitions[i]); } if (anyTrans.length === 0) throw new Error('No transitions from Any State'); var animMap = vars.animMap; var states = myLayer.states || []; var animStates = []; for (var s = 0; s < states.length; s++) { if (states[s].type === 'animation' || states[s].linearAnimationId) animStates.push(states[s]); } var conds = []; for (var i = 0; i < anyTrans.length; i++) { var toId = anyTrans[i].toStateId; var condVal = 0; for (var a = 0; a < animStates.length; a++) { if (animStates[a].id === toId) { condVal = a; break; } } conds.push({ id: anyTrans[i].id, conditions: [{ leftComparator: { viewModelPropertyId: prop.id }, comparatorOperation: 'equal', rightComparator: { value: String(condVal), valueType: 'number' } }] }); } setVar('conditionData', conds); toast('Conditions values: ' + conds.map(function(c,i) { return 'T' + i + '=' + c.conditions[0].rightComparator.value; }).join(', '), 'info');",
+      "label": "Build conditions"
+    },
+    {
+      "tool": "animation_editor",
+      "args": "{ \"command\": \"createConditions\", \"data\": { \"createConditions\": { \"transitions\": {{json:conditionData}} } } }",
+      "label": "Set conditions"
+    },
+    {
+      "tool": "_toast",
+      "args": "Done! {{childCount}} timelines with SM layer and VM conditions",
+      "toastType": "success",
+      "label": "Complete"
+    }
+  ]
+}

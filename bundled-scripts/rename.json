@@ -1,0 +1,43 @@
+{
+  "title": "Sequential Rename",
+  "description": "Renames selected layers: incremental naming and/or search-replace in existing names",
+  "icon": "edit",
+  "category": "utility",
+  "tags": ["rename", "batch", "selection", "increment", "replace"],
+  "hasUi": true,
+  "steps": [
+    {
+      "tool": "get_selection",
+      "args": "{}",
+      "label": "Get selection"
+    },
+    {
+      "tool": "_compute",
+      "args": "var raw = results[0]; var data = JSON.parse(raw); var items = data.selection || (Array.isArray(data) ? data : []); var valid = items.filter(function(o) { return o && o.id; }); if (valid.length === 0) throw new Error('No objects selected.'); setVar('selCount', String(valid.length)); setVar('selItems', valid);",
+      "label": "Validate selection"
+    },
+    {
+      "tool": "_ui",
+      "ui": {
+        "title": "Rename ({{selCount}} objects)",
+        "fields": [
+          { "key": "prefix", "label": "Base name (empty = keep original)", "type": "text", "default": "" },
+          { "key": "startNumber", "label": "Start number", "type": "number", "default": 1 },
+          { "key": "searchText", "label": "Text to find", "type": "text", "default": "" },
+          { "key": "replaceText", "label": "Replace with", "type": "text", "default": "" }
+        ]
+      },
+      "label": "Rename configuration"
+    },
+    {
+      "tool": "_compute",
+      "args": "var prefix = vars.prefix || ''; var start = parseInt(vars.startNumber, 10); if (isNaN(start)) start = 1; var search = vars.searchText || ''; var replace = vars.replaceText || ''; var items = vars.selItems; var renames = []; for (var i = 0; i < items.length; i++) { var name; if (prefix) { name = prefix + String(start + i); } else { name = items[i].name; } if (search) { name = name.split(search).join(replace); } renames.push({ id: items[i].id, name: name }); } setVar('renames', renames); setVar('count', String(renames.length));",
+      "label": "Build names"
+    },
+    {
+      "tool": "rename_objects",
+      "args": "{ \"renames\": {{json:renames}} }",
+      "label": "Apply renaming ({{count}} objects)"
+    }
+  ]
+}
