@@ -5618,7 +5618,7 @@ bone, artboard, search, star, code, layout, palette, grid, layers, eye, lock, un
 ## Creating Luau scripts via RiveBar
 
 Use manage_scripts to inject Luau code into Rive. The tool accepts:
-- { "action": "create", "name": "MyScript", "code": "...", "type": "node|pathEffect|layout|converter|tests|utility|none" }
+- { "action": "create", "name": "MyScript", "code": "...", "type": "node|pathEffect|layout|converter|listenerAction|transitionCondition|interpolator|tests|utility|none" }
 - { "action": "update", "name": "MyScript", "code": "..." }
 - { "action": "read", "name": "MyScript" }
 - { "action": "delete", "name": "MyScript" }
@@ -5626,10 +5626,13 @@ Use manage_scripts to inject Luau code into Rive. The tool accepts:
 After creating/updating, call script_diagnostics { "name": "MyScript" } to check for errors, then compile_script { "name": "MyScript" } to apply.
 
 ### Luau script types
-- node: Custom drawable node (init, advance, update, draw, pointer events)
+- node: Custom drawable node (init, advance, update, draw, pointer events, gamepad events)
 - pathEffect: Transforms paths (update receives PathData, returns PathData)
 - layout: Node with measure/resize for custom layout
 - converter: Data converter (convert/reverseConvert)
+- listenerAction: Fires when a State Machine Listener triggers (init, performAction(self, listenerContext))
+- transitionCondition: Custom condition evaluated each frame for a state machine transition (init, evaluate(self): boolean)
+- interpolator: Custom easing curve (transform(self, value): number, transformValue(self, from, to, value): number)
 - tests: Test suites
 - utility/none: Reusable modules
 
@@ -5711,13 +5714,16 @@ end
 \`\`\`
 
 ### Key Luau types available
-- Vector: Vector.xy(x,y), +, -, *, /, :length(), :normalized(), :dot(), :lerp(), :distance()
-- Color: Color.rgb(r,g,b), Color.rgba(r,g,b,a), Color.lerp(from,to,t), Color.red/green/blue/alpha/opacity(c, val?)
+- Vector: 3D (x,y,z; z=0 for xy()). Vector.xy(x,y), Vector.xyz(x,y,z), +, -, *, /. PREFER static forms: Vector.length(v), Vector.normalized(v), Vector.dot(a,b), Vector.lerp(from,to,t), Vector.distance(a,b), Vector.cross(a,b), Vector.cross3(a,b), Vector.scaleAndAdd/scaleAndSub(a,b,scale). (Instance methods like v:length() still work but are deprecated.)
+- Color: Color.rgb(r,g,b), Color.rgba(r,g,b,a), Color.lerp(from,to,t), Color.red/green/blue/alpha/opacity(c, val?), Color.toFloat(c) -> {r,g,b,a} 0-1 table (for GPU clearColor)
 - Paint: Paint.new(), Paint.with({ color, style, thickness, cap, join, blendMode, feather, gradient })
 - Path: Path.new(), :moveTo(), :lineTo(), :cubicTo(), :quadTo(), :close(), :reset(), :add(), :measure(), :contours()
 - Mat2D: Mat2D.identity(), Mat2D.withTranslation(), Mat2D.withRotation(), Mat2D.withScale()
+- Mat4: 4x4 matrix for 3D/GPU work. Mat4.identity(), Mat4.fromTranslation/fromScale/fromRotationX|Y|Z, Mat4.perspective(fovY,aspect,near,far), Mat4.perspectiveReverseZ, Mat4.lookAt(eye,center,up), Mat4.ortho, m:invert(), m:transformPoint(x,y,z), m:writeToBuffer(buf, offset) for GPU UBO upload
 - Gradient: Gradient.linear(from, to, stops), Gradient.radial(center, radius, stops)
-- ViewModel: context:viewModel():getNumber/getString/getBoolean/getColor/getTrigger/getList/getEnum(name)
+- ViewModel: context:viewModel():getNumber/getString/getBoolean/getColor/getTrigger/getList/getEnum/getImage(name); context:rootViewModel() for the root artboard's data; typed ViewModels available as Data.MyViewModel.new()
+- Context: also has dataContext(), image(name), blob(name), audio(name) for embedded assets
+- Audio: context:audio(name) -> AudioSource, then Audio.play(source) / Audio.playAtTime/playInTime/playAtFrame/playInFrame -> AudioSound (:pause/:resume/:stop/:seek)
 
 ### RiveBar script that creates a Luau node
 Example of a RiveBar JSON script that injects Luau code:
